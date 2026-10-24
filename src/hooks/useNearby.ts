@@ -1,40 +1,21 @@
 import { useSyncExternalStore } from 'react';
-import {
-  detectDeviceKind,
-  NearbyNetwork,
-  randomDeviceName,
-  type DeviceKind,
-  type IncomingRequest,
-  type NearbyDevice,
-} from '../lib/signaling/nearby';
+import { NearbyNetwork, type IncomingRequest, type NearbyDevice } from '../lib/signaling/nearby';
+import { selfDevice, type DeviceInfo } from '../lib/device';
 import { session } from './useSession';
 
 export interface NearbySnapshot {
   status: 'off' | 'searching' | 'active' | 'unavailable';
-  self: { name: string; kind: DeviceKind };
+  self: DeviceInfo;
   devices: NearbyDevice[];
   incoming: IncomingRequest | null;
   outgoing: { device: NearbyDevice; requestId: string | null } | null;
   notice: string | null;
 }
 
-/** A random, friendly name that stays the same for this tab (survives reloads, not shared). */
-function selfName(): string {
-  try {
-    const saved = sessionStorage.getItem('theshare-name');
-    if (saved) return saved;
-    const name = randomDeviceName();
-    sessionStorage.setItem('theshare-name', name);
-    return name;
-  } catch {
-    return randomDeviceName();
-  }
-}
-
 class Nearby {
   private state: NearbySnapshot = {
     status: 'off',
-    self: { name: selfName(), kind: detectDeviceKind() },
+    self: selfDevice(),
     devices: [],
     incoming: null,
     outgoing: null,

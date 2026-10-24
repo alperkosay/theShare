@@ -18,6 +18,9 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:4173',
     trace: 'retain-on-failure',
+    // Functional tests: skip decorative motion (headless Chromium renders it on the CPU,
+    // which makes runs slow and timing-sensitive). The reduced-motion path is real UI too.
+    reducedMotion: 'reduce',
   },
   projects: [
     {

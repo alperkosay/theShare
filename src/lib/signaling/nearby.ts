@@ -1,4 +1,5 @@
 import { STUN_SERVERS } from '../webrtc/peer';
+import { parseDeviceType, type DeviceInfo } from '../device';
 import { deriveRoom, randomId, seal, TrackerPool, unseal, type TrackerMessage } from './tracker';
 
 /**
@@ -20,7 +21,6 @@ import { deriveRoom, randomId, seal, TrackerPool, unseal, type TrackerMessage } 
  *  - Needs internet: the STUN server learns your public IP (like any website).
  */
 
-
 const HELLO_EVERY_MS = 4_000;
 const DEVICE_TTL_MS = 15_000;
 /** Each hello copy reaches one random member; several copies reach a whole household per round. */
@@ -30,12 +30,8 @@ const MAX_REPLY_IDS = 24;
 const REQUEST_TIMEOUT_MS = 60_000;
 const PUBLIC_IP_TIMEOUT_MS = 6_000;
 
-export type DeviceKind = 'phone' | 'tablet' | 'computer';
-
-export interface NearbyDevice {
+export interface NearbyDevice extends DeviceInfo {
   id: string;
-  name: string;
-  kind: DeviceKind;
 }
 
 export interface IncomingRequest {
@@ -45,8 +41,8 @@ export interface IncomingRequest {
 }
 
 type Message =
-  | { t: 'hello'; name: string; kind: DeviceKind }
-  | { t: 'request'; rid: string; name: string; kind: DeviceKind; offer: string }
+  | ({ t: 'hello' } & DeviceInfo)
+  | ({ t: 'request'; rid: string; offer: string } & DeviceInfo)
   | { t: 'response'; rid: string; accept: boolean; answer?: string }
   | { t: 'cancel'; rid: string };
 
@@ -54,14 +50,14 @@ function parseMessage(text: string | null): Message | null {
   if (!text) return null;
   try {
     const m = JSON.parse(text) as Record<string, unknown>;
-    const name = typeof m.name === 'string' ? m.name.slice(0, 40) : '';
-    const kind: DeviceKind = m.kind === 'phone' || m.kind === 'tablet' ? m.kind : 'computer';
+    const name = typeof m.name === 'string' ? m.name.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 40) : '';
+    const device = { name, ...parseDeviceType(m.kind, m.os) };
     const rid = typeof m.rid === 'string' && m.rid.length <= 40 ? m.rid : null;
     switch (m.t) {
       case 'hello':
-        return name ? { t: 'hello', name, kind } : null;
+        return name ? { t: 'hello', ...device } : null;
       case 'request':
-        return rid && name && typeof m.offer === 'string' ? { t: 'request', rid, name, kind, offer: m.offer } : null;
+        return rid && name && typeof m.offer === 'string' ? { t: 'request', rid, offer: m.offer, ...device } : null;
       case 'response':
         return rid && typeof m.accept === 'boolean'
           ? { t: 'response', rid, accept: m.accept, ...(typeof m.answer === 'string' ? { answer: m.answer } : {}) }
@@ -149,7 +145,7 @@ export class NearbyNetwork {
   private stopped = false;
 
   constructor(
-    private readonly self: { name: string; kind: DeviceKind },
+    private readonly self: DeviceInfo,
     private readonly handlers: NearbyHandlers,
   ) {}
 
@@ -196,7 +192,7 @@ export class NearbyNetwork {
       }, REQUEST_TIMEOUT_MS);
       this.pending.set(requestId, { resolve, timer });
     });
-    void this.direct(deviceId, { t: 'request', rid: requestId, name: this.self.name, kind: this.self.kind, offer });
+    void this.direct(deviceId, { t: 'request', rid: requestId, offer, ...this.self });
     return { requestId, answer };
   }
 
@@ -218,7 +214,7 @@ export class NearbyNetwork {
 
   private async announce(socket: WebSocket): Promise<void> {
     if (!this.key || !this.pool) return;
-    const hello = await seal(this.key, JSON.stringify({ t: 'hello', name: this.self.name, kind: this.self.kind }));
+    const hello = await seal(this.key, JSON.stringify({ t: 'hello', ...this.self }));
     this.pool.send(socket, {
       action: 'announce',
       info_hash: this.infoHash,
@@ -272,8 +268,8 @@ export class NearbyNetwork {
       const replyIds = known?.replyIds ?? [];
       if (typeof msg.offer_id === 'string') replyIds.push([socket, msg.offer_id]);
       if (replyIds.length > MAX_REPLY_IDS) replyIds.splice(0, replyIds.length - MAX_REPLY_IDS);
-      const changed = !known || known.name !== m.name || known.kind !== m.kind;
-      this.devices.set(from, { id: from, name: m.name, kind: m.kind, lastSeen: Date.now(), replyIds });
+      const changed = !known || known.name !== m.name || known.kind !== m.kind || known.os !== m.os;
+      this.devices.set(from, { id: from, name: m.name, kind: m.kind, os: m.os, lastSeen: Date.now(), replyIds });
       if (changed) this.emitDevices();
       return;
     }
@@ -283,7 +279,7 @@ export class NearbyNetwork {
       // Requests are deduplicated: the same one arrives through several trackers.
       if (this.seenRequests.has(m.rid)) return;
       this.seenRequests.add(m.rid);
-      this.handlers.onRequest({ requestId: m.rid, from: { id: from, name: m.name, kind: m.kind }, offer: m.offer });
+      this.handlers.onRequest({ requestId: m.rid, from: { id: from, name: m.name, kind: m.kind, os: m.os }, offer: m.offer });
     } else if (m.t === 'response') {
       const p = this.pending.get(m.rid);
       if (!p) return;
@@ -309,26 +305,7 @@ export class NearbyNetwork {
 
   private emitDevices(): void {
     this.handlers.onDevices(
-      [...this.devices.values()].map(({ id, name, kind }) => ({ id, name, kind })).sort((a, b) => a.name.localeCompare(b.name, 'tr')),
+      [...this.devices.values()].map(({ id, name, kind, os }) => ({ id, name, kind, os })).sort((a, b) => a.name.localeCompare(b.name, 'tr')),
     );
   }
-}
-
-// ---------------------------------------------------------------------------
-// Device names
-// ---------------------------------------------------------------------------
-
-const ADJECTIVES = ['Mavi', 'Kırmızı', 'Yeşil', 'Mor', 'Turuncu', 'Sarı', 'Pembe', 'Turkuaz', 'Gri', 'Lacivert', 'Altın', 'Gümüş'];
-const ANIMALS = ['Tilki', 'Kaplan', 'Baykuş', 'Yunus', 'Kartal', 'Panda', 'Kedi', 'Ceylan', 'Kunduz', 'Penguen', 'Sincap', 'Martı'];
-
-export function randomDeviceName(): string {
-  const pick = <T,>(list: T[]) => list[crypto.getRandomValues(new Uint32Array(1))[0]! % list.length]!;
-  return `${pick(ADJECTIVES)} ${pick(ANIMALS)}`;
-}
-
-export function detectDeviceKind(ua = navigator.userAgent): DeviceKind {
-  if (/iPad|Tablet/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return 'tablet';
-  if (/Android/i.test(ua) && !/Mobile/i.test(ua)) return 'tablet';
-  if (/iPhone|Android|Mobile/i.test(ua)) return 'phone';
-  return 'computer';
 }

@@ -27,15 +27,15 @@ export function CodeJoinScreen({ initialCode }: { initialCode: string | null }) 
 
   if (linkState === 'failed') {
     return (
-      <main className="screen" data-testid="link-status" data-state={linkState}>
+      <div className="page">
         <BackButton />
         <Failed error={error} />
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="screen" data-testid="link-status" data-state={linkState}>
+    <div className="page">
       <BackButton />
       {busy ? (
         <Waiting text="Bağlanılıyor…" />
@@ -72,11 +72,9 @@ export function CodeJoinScreen({ initialCode }: { initialCode: string | null }) 
               {codeError}
             </p>
           )}
+          <p className="small muted center">Kod, diğer cihazda "Kod oluştur"a dokununca görünür.</p>
         </form>
       )}
-      <button type="button" className="link" onClick={() => session.reset({ role: 'join', method: 'qr' })} data-testid="qr-fallback">
-        İnternet yok mu? QR ile bağlan
-      </button>
-    </main>
+    </div>
   );
 }

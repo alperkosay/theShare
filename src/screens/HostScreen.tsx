@@ -35,9 +35,9 @@ export function HostScreen() {
   }
 
   return (
-    <main className="screen" data-testid="link-status" data-state={linkState}>
+    <div className="page">
       <BackButton />
       {content}
-    </main>
+    </div>
   );
 }

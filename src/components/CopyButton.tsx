@@ -1,11 +1,13 @@
 import { useState } from 'react';
+import { Icon } from './Icon';
 
 interface Props {
   text: string;
   label: string;
+  className?: string;
 }
 
-async function copyText(text: string): Promise<boolean> {
+export async function copyText(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text);
     return true;
@@ -24,7 +26,7 @@ async function copyText(text: string): Promise<boolean> {
   }
 }
 
-export function CopyButton({ text, label }: Props) {
+export function CopyButton({ text, label, className = 'link' }: Props) {
   const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
 
   const onClick = async () => {
@@ -33,8 +35,37 @@ export function CopyButton({ text, label }: Props) {
   };
 
   return (
-    <button type="button" className="link" onClick={onClick}>
+    <button type="button" className={className} onClick={onClick}>
+      <Icon name="copy" />
       {state === 'copied' ? 'Kopyalandı ✓' : state === 'failed' ? 'Kopyalanamadı' : label}
+    </button>
+  );
+}
+
+/** Opens the OS share sheet (WhatsApp, Messages…) where available, otherwise copies. */
+export function ShareButton({ title, text, url, label }: { title: string; text: string; url: string; label: string }) {
+  const [copied, setCopied] = useState(false);
+  const canShare = typeof navigator.share === 'function';
+
+  const onClick = async () => {
+    if (canShare) {
+      try {
+        await navigator.share({ title, text, url });
+        return;
+      } catch (e) {
+        if ((e as DOMException).name === 'AbortError') return;
+      }
+    }
+    if (await copyText(`${text}\n${url}`)) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  return (
+    <button type="button" className="btn primary big" onClick={() => void onClick()} data-testid="share-code">
+      <Icon name={canShare ? 'share' : 'link'} />
+      {copied ? 'Bağlantı kopyalandı ✓' : label}
     </button>
   );
 }

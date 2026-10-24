@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { detectDeviceKind, ipv6Prefix, randomDeviceName } from '../../src/lib/signaling/nearby';
+import { ipv6Prefix } from '../../src/lib/signaling/nearby';
+import { detectDeviceKind, randomDeviceName } from '../../src/lib/device';
 
 describe('ipv6Prefix', () => {
   it('returns the expanded /64 prefix', () => {

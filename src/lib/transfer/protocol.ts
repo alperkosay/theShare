@@ -18,6 +18,8 @@
  *   cancel {id} may be sent by either side at any time.
  */
 
+import { parseDeviceType, type DeviceKind, type DeviceOs } from '../device';
+
 export const PROTOCOL_VERSION = 1;
 export const MAX_FILES_PER_TRANSFER = 500;
 const MAX_CONTROL_LENGTH = 512 * 1024;
@@ -30,8 +32,13 @@ export interface FileMeta {
   type: string;
 }
 
+/** Text/clipboard messages: generous, but bounded so a peer can't flood memory. */
+export const MAX_TEXT_LENGTH = 100_000;
+
 export type ControlMessage =
-  | { t: 'hello'; v: number }
+  /** Sent once on connect; name/kind are the random display identity (see lib/device). */
+  | { t: 'hello'; v: number; name?: string; kind?: DeviceKind; os?: DeviceOs }
+  | { t: 'text'; id: string; text: string }
   | { t: 'offer'; id: string; files: FileMeta[] }
   | { t: 'accept'; id: string }
   | { t: 'reject'; id: string; reason?: string }
@@ -69,8 +76,15 @@ export function parseControl(text: string): ControlMessage | null {
     return null;
   }
   switch (m.t) {
-    case 'hello':
-      return isCount(m.v) ? { t: 'hello', v: m.v } : null;
+    case 'hello': {
+      if (!isCount(m.v)) return null;
+      const name = typeof m.name === 'string' ? m.name.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 40) : '';
+      return { t: 'hello', v: m.v, ...(name ? { name, ...parseDeviceType(m.kind, m.os) } : {}) };
+    }
+    case 'text':
+      return isId(m.id) && typeof m.text === 'string' && m.text.length > 0 && m.text.length <= MAX_TEXT_LENGTH
+        ? { t: 'text', id: m.id, text: m.text }
+        : null;
     case 'offer': {
       if (!isId(m.id) || !Array.isArray(m.files)) return null;
       if (m.files.length === 0 || m.files.length > MAX_FILES_PER_TRANSFER) return null;

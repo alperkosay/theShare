@@ -29,13 +29,11 @@ async function expectConnected(host: Page, joiner: Page): Promise<void> {
 /** Pairs two pages with the offline QR flow (codes pasted as text). No internet needed. */
 async function pair(host: Page, joiner: Page): Promise<void> {
   await host.goto('/');
-  await host.getByTestId('start-host').click();
-  await host.getByTestId('qr-fallback').click();
+  await host.getByTestId('qr-host').click();
   const offer = await readCode(host, /#s=TS[1Z]\./);
 
   await joiner.goto('/');
-  await joiner.getByTestId('start-join').click();
-  await joiner.getByTestId('qr-fallback').click();
+  await joiner.getByTestId('qr-join').click();
   await pasteCode(joiner, offer);
   const answer = await readCode(joiner, /^TS[1Z]\./);
 
@@ -83,6 +81,36 @@ test('Chromium ↔ Chromium: pair via text, send several files incl. empty and l
   await transferFiles(joiner, host, [{ name: 'geri.txt', buffer: Buffer.from('cevap') }]);
 });
 
+test('text messages arrive as bubbles; peers show each other\'s name and OS', async ({ browser }) => {
+  const host = await (await browser.newContext({ userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148' })).newPage();
+  const joiner = await (await browser.newContext()).newPage();
+  await pair(host, joiner);
+
+  // Each side shows the other's random name and device label (from the hello message).
+  await expect(joiner.getByTestId('peer-label')).toHaveText(/iPhone/);
+  await expect(joiner.getByTestId('peer-name')).toHaveText(/^\S+ \S+$/);
+  await expect(host.getByTestId('peer-label')).toHaveText(/Windows bilgisayar/);
+
+  // Texts live in the "Pano" tab; the receiver gets an unread badge until it opens it.
+  await host.getByTestId('tab-clipboard').click();
+  const note = 'Merhaba 👋\nikinci satır <b>html değil</b>';
+  await host.getByTestId('text-input').fill(note);
+  await host.getByTestId('text-send').click();
+  await expect(joiner.getByTestId('tab-clipboard')).toContainText('1');
+  await joiner.getByTestId('tab-clipboard').click();
+  const incoming = joiner.locator('[data-testid=message][data-direction=in]').first();
+  await expect(incoming).toContainText('ikinci satır <b>html değil</b>'); // rendered as text
+  await expect(host.locator('[data-testid=message][data-direction=out]')).toHaveCount(1);
+
+  // A bare link gets an "open" button.
+  await joiner.getByTestId('text-input').fill('https://example.com/yol?a=1');
+  await joiner.getByTestId('text-input').press('Control+Enter');
+  await expect(host.locator('[data-testid=message][data-direction=in]').first().getByRole('link', { name: 'Aç' })).toHaveAttribute(
+    'href',
+    'https://example.com/yol?a=1',
+  );
+});
+
 test('receiver can reject; sender sees it', async ({ browser }) => {
   const { a: host, b: joiner } = await twoDevices(browser);
   await pair(host, joiner);
@@ -113,8 +141,7 @@ test('cancel mid-transfer and disconnect are reported on the other side', async 
 
 test('invalid and mismatched codes show a clear error', async ({ page }) => {
   await page.goto('/');
-  await page.getByTestId('start-join').click();
-  await page.getByTestId('qr-fallback').click();
+  await page.getByTestId('qr-join').click();
   await pasteCode(page, 'bu bir kod değil');
   await expect(page.getByRole('alert')).toContainText('theShare bağlantı kodu değil');
 
@@ -126,8 +153,7 @@ test('invalid and mismatched codes show a clear error', async ({ page }) => {
 test('opening the offer link directly starts joining', async ({ browser }) => {
   const { a: host, b: joiner } = await twoDevices(browser);
   await host.goto('/');
-  await host.getByTestId('start-host').click();
-  await host.getByTestId('qr-fallback').click();
+  await host.getByTestId('qr-host').click();
   const offer = await readCode(host, /#s=TS[1Z]\./);
 
   await joiner.goto(offer.replace(/^https?:\/\/[^/]+/, ''));

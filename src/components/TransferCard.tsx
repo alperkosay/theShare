@@ -1,6 +1,7 @@
 import { formatBytes, formatSpeed } from '../lib/format';
 import type { TransferStatus, TransferView } from '../lib/transfer/manager';
 import { session } from '../hooks/useSession';
+import { Icon } from './Icon';
 
 const STATUS: Record<'in' | 'out', Record<TransferStatus, string>> = {
   out: {
@@ -37,10 +38,10 @@ export function TransferCard({ transfer: t }: { transfer: TransferView }) {
   if (t.status === 'done' && t.sinkKind === 'disk') detail += ' · seçtiğiniz konuma kaydedildi';
 
   return (
-    <article className={`transfer ${t.status}`} data-testid="transfer" data-direction={t.direction} data-status={t.status}>
+    <article className={`glass transfer ${t.status}`} data-testid="transfer" data-direction={t.direction} data-status={t.status}>
       <div className="row">
         <span className="arrow" aria-label={t.direction === 'out' ? 'Giden' : 'Gelen'}>
-          {t.direction === 'out' ? '↑' : '↓'}
+          <Icon name={t.status === 'done' ? 'check' : t.direction === 'out' ? 'arrowUp' : 'arrowDown'} />
         </span>
         <div className="grow">
           <div className="filename">{single ? t.files[0]!.name : `${t.files.length} dosya`}</div>

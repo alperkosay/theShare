@@ -3,7 +3,8 @@ import { PeerLink, type LinkState } from '../lib/webrtc/peer';
 import { SignalError } from '../lib/webrtc/signal-codec';
 import { pairingCode } from '../lib/webrtc/pairing-code';
 import { CODE_TTL_MS, generateCode, hostWithCode, joinWithCode, normalizeCode } from '../lib/signaling/code-rendezvous';
-import { TransferManager, type TransferView } from '../lib/transfer/manager';
+import { TransferManager, type TextMessage, type TransferView } from '../lib/transfer/manager';
+import type { DeviceInfo } from '../lib/device';
 
 export type Role = 'host' | 'join';
 /**
@@ -20,13 +21,17 @@ export interface SessionSnapshot {
   error: string | null;
   /** 6-digit code shown by the host in 'code' mode. */
   pairCode: string | null;
-  /** Name of the nearby device we are connecting to ('nearby' mode). */
+  /** The other device's display name: from the nearby list, or its hello once connected. */
   peerName: string | null;
+  /** The other device's type/OS, known once connected (from its hello). */
+  peer: DeviceInfo | null;
   /** QR mode: our offer (host) or answer (joiner) payload to show as QR/text. */
   localCode: string | null;
   wasConnected: boolean;
   pairingCode: string | null;
   transfers: TransferView[];
+  /** Text/clipboard messages, oldest first. */
+  messages: TextMessage[];
 }
 
 const initial: SessionSnapshot = {
@@ -36,10 +41,12 @@ const initial: SessionSnapshot = {
   error: null,
   pairCode: null,
   peerName: null,
+  peer: null,
   localCode: null,
   wasConnected: false,
   pairingCode: null,
   transfers: [],
+  messages: [],
 };
 
 /**
@@ -196,6 +203,16 @@ class Session {
     }
   }
 
+  /** Returns a user-facing error, or null. */
+  sendText(text: string): string | null {
+    try {
+      this.manager?.sendText(text);
+      return null;
+    } catch (e) {
+      return e instanceof Error ? e.message : 'Metin gönderilemedi.';
+    }
+  }
+
   sendFiles(files: File[]): string | null {
     try {
       this.manager?.sendFiles(files);
@@ -246,6 +263,8 @@ class Session {
         clearTimeout(this.expiryTimer);
         const manager = new TransferManager(link);
         manager.onChange = (transfers) => this.set({ transfers });
+        manager.onText = (message) => this.set({ messages: [...this.state.messages, message] });
+        manager.onPeerInfo = (peer) => this.set({ peerName: peer.name, peer });
         manager.onPeerLeft = () => {
           this.peerLeft = true;
         };

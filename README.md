@@ -91,7 +91,11 @@ Bağlantı bilgisi QR'a sığsın diye SDP küçültülür (~110–200 karakter)
 
 ## Özellikler
 
+- **Arayüz:** Mobil uygulama gibi altta bir dock ile üç sekme: **Cihazlar** (radar, bağlantı), **Dosyalar**, **Pano**. Koyu ve açık tema sistem ayarını izler. Animasyonlar "hareketi azalt" ayarına uyar ve dosya aktarımı sürerken süs animasyonları durur. Yazı tipi (Space Grotesk, OFL) uygulamayla birlikte gelir.
 - Bir veya çok dosya gönderme, **alıcı onayı zorunlu**
+- **Metin ve pano:** Not, bağlantı veya kod gönderme; "Panodakini gönder" ile tek dokunuşta pano içeriği. Gelen metin sohbet balonu olarak görünür ve "Kopyala" ile alınır. Yalnızca `http(s)` bağlantılarına "Aç" düğmesi çıkar; metin her zaman düz metin olarak gösterilir, HTML olarak işlenmez. Metin için onay istenmez, en fazla 100.000 karakter.
+- **Cihaz adı ve türü:** Her cihaz rastgele bir ad ("Mavi Kaplan") ve türüyle görünür: iPhone, iPad, Android telefon/tablet, Windows/Linux bilgisayar, Mac. Bu bilgi tarayıcının kendi bildirdiği bilgiden tahmin edilir; gerçek cihaz adı paylaşılmaz.
+- **Bağlantı paylaşma:** Kod ekranındaki "Bağlantıyı paylaş" ile kod, link olarak WhatsApp vb. üzerinden gönderilebilir. Linke tıklayan kişi otomatik bağlanır.
 - **ZIP olarak gönderme:** Birden çok dosya tek bir `.zip` olarak gidebilir. Sıkıştırma yapılmaz, ZIP gönderen cihazda belleğe kopyalanmadan oluşturulur ([zip.ts](src/lib/transfer/zip.ts)). Toplam en fazla ~4 GB; daha büyükse dosyalar ayrı gider.
 - Dosyaları pencereye **sürükle-bırak**
 - İlerleme, hız, iptal; bağlantı koparsa bildirim
@@ -157,13 +161,14 @@ src/
   lib/qr/                         QR üretme/tarama
 ```
 
-**Çalışma zamanı bağımlılıkları:** `react`, `react-dom`, `uqr`, `barcode-detector` + `zxing-wasm`, `workbox-window`.
+**Çalışma zamanı bağımlılıkları:** `react`, `react-dom`, `uqr`, `barcode-detector` + `zxing-wasm`, `workbox-window`, `@fontsource-variable/space-grotesk`.
 
 ## Test durumu
 
 | Senaryo | Durum |
 |---|---|
-| Signaling codec, protokol doğrulama, dosya adı temizleme, kod/şifreleme, ZIP biçimi | ✅ Birim testi (36) |
+| Signaling codec, protokol doğrulama, dosya adı temizleme, kod/şifreleme, ZIP biçimi, cihaz/işletim sistemi tespiti, metin mesajı doğrulama | ✅ Birim testi (46) |
+| Metin mesajları (HTML olarak işlenmemesi, link "Aç" düğmesi); karşı cihaz adı ve türünün görünmesi | ✅ E2E |
 | 6 haneli kodla eşleştirme + aktarım (gerçek tracker'lar üzerinden) | ✅ E2E |
 | Kod QR'ıyla otomatik katılma; yanlış kodda anlaşılır hata | ✅ E2E |
 | Yakındaki cihazlar: listede görünme → istek → onay → aktarım (aynı makinede iki tarayıcı) | ✅ E2E |

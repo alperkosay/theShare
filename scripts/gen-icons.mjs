@@ -3,7 +3,9 @@
 import { deflateSync } from 'node:zlib';
 import { writeFileSync } from 'node:fs';
 
-const BG = [15, 118, 110];
+// Background: diagonal violet → cyan gradient (matches --grad in styles.css).
+const BG_FROM = [139, 92, 246];
+const BG_TO = [34, 211, 238];
 const FG = [255, 255, 255];
 const SAMPLES = 4; // supersampling per axis for anti-aliasing
 
@@ -57,7 +59,11 @@ function png(size) {
       }
       const a = hits / (SAMPLES * SAMPLES);
       const o = y * (size * 3 + 1) + 1 + x * 3;
-      for (let i = 0; i < 3; i++) raw[o + i] = Math.round(BG[i] * (1 - a) + FG[i] * a);
+      const t = (x + y) / (2 * (size - 1));
+      for (let i = 0; i < 3; i++) {
+        const bg = BG_FROM[i] * (1 - t) + BG_TO[i] * t;
+        raw[o + i] = Math.round(bg * (1 - a) + FG[i] * a);
+      }
     }
   }
   const ihdr = Buffer.alloc(13);

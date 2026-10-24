@@ -8,7 +8,7 @@ export function NearbyConnectScreen() {
   const { outgoing } = useNearby();
 
   return (
-    <main className="screen" data-testid="link-status" data-state={linkState}>
+    <div className="page">
       {linkState === 'failed' ? (
         <Failed error={error} />
       ) : (
@@ -19,6 +19,6 @@ export function NearbyConnectScreen() {
           </button>
         </>
       )}
-    </main>
+    </div>
   );
 }
