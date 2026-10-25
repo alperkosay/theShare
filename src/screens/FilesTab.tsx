@@ -1,11 +1,14 @@
 import { useRef, useState, type CSSProperties } from 'react';
 import { session, useSession } from '../hooks/useSession';
+import { history, useHistory } from '../hooks/useHistory';
+import { formatBytes } from '../lib/format';
+import { canPickWithHandles, filesFromDrop, pickFilesWithHandles } from '../lib/storage/resend';
 import { canZip, defaultZipName, zipFiles } from '../lib/transfer/zip';
 import { TransferCard } from '../components/TransferCard';
 import { NotConnected, PeerBar } from '../components/PeerBar';
 import { Icon } from '../components/Icon';
 
-/** "Files" tab: pick or drop files to send; incoming offers and history. */
+/** "Files" tab: pick or drop files to send; incoming offers, this session's transfers, the pending queue. */
 export function FilesTab({ onOpenDevices }: { onOpenDevices: () => void }) {
   const { linkState, wasConnected, transfers } = useSession();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -17,7 +20,12 @@ export function FilesTab({ onOpenDevices }: { onOpenDevices: () => void }) {
   const canSend = connected && !sending;
 
   if (!wasConnected) {
-    return <NotConnected text="Dosya göndermek ve almak için önce bir cihaza bağlanın." onConnect={onOpenDevices} />;
+    return (
+      <>
+        <NotConnected text="Dosya göndermek ve almak için önce bir cihaza bağlanın." onConnect={onOpenDevices} />
+        <PendingList connected={false} />
+      </>
+    );
   }
 
   const send = async (files: File[]) => {
@@ -35,6 +43,16 @@ export function FilesTab({ onOpenDevices }: { onOpenDevices: () => void }) {
     }
     const err = session.sendFiles(payload);
     if (err) alert(err);
+  };
+
+  // Chromium desktop: the picker that hands out file handles, so resend needs no stored copy.
+  const pick = async () => {
+    if (!canPickWithHandles()) return inputRef.current?.click();
+    try {
+      await send(await pickFilesWithHandles());
+    } catch (e) {
+      if ((e as DOMException).name !== 'AbortError') inputRef.current?.click();
+    }
   };
 
   return (
@@ -57,7 +75,7 @@ export function FilesTab({ onOpenDevices }: { onOpenDevices: () => void }) {
         type="button"
         className={`dropzone rise${dragging ? ' over' : ''}`}
         disabled={!canSend}
-        onClick={() => inputRef.current?.click()}
+        onClick={() => void pick()}
         onDragOver={(e) => {
           if (!canSend || !e.dataTransfer.types.includes('Files')) return;
           e.preventDefault();
@@ -67,7 +85,7 @@ export function FilesTab({ onOpenDevices }: { onOpenDevices: () => void }) {
         onDrop={(e) => {
           e.preventDefault();
           setDragging(false);
-          void send(Array.from(e.dataTransfer.files));
+          void filesFromDrop(e.dataTransfer).then(send);
         }}
       >
         <span className="dropzone-icon">
@@ -83,6 +101,8 @@ export function FilesTab({ onOpenDevices }: { onOpenDevices: () => void }) {
         Birden çok dosyayı tek ZIP olarak gönder
       </label>
 
+      <PendingList connected={connected} />
+
       <section className="stack" aria-label="Aktarımlar">
         {transfers.length === 0 ? (
           <p className="small muted center">Gönderdiğiniz ve gelen dosyalar burada görünür.</p>
@@ -95,5 +115,29 @@ export function FilesTab({ onOpenDevices }: { onOpenDevices: () => void }) {
         )}
       </section>
     </>
+  );
+}
+
+/** Resends waiting for a connection, or for the current send to finish. */
+function PendingList({ connected }: { connected: boolean }) {
+  const { pending } = useHistory();
+  if (!pending.length) return null;
+  return (
+    <section className="glass pending rise" aria-label="Bekleyenler" data-testid="pending">
+      <h2 className="eyebrow">
+        {connected ? 'Sırada bekleyen' : 'Bağlanınca gönderilecek'} ({pending.length})
+      </h2>
+      <ul className="files">
+        {pending.map((p) => (
+          <li key={p.id}>
+            <span className="filename grow">{p.files.length === 1 ? p.files[0]!.name : `${p.files.length} dosya`}</span>
+            <span className="small muted">{formatBytes(p.files.reduce((sum, f) => sum + f.size, 0))}</span>
+            <button type="button" className="link danger" onClick={() => history.removePending(p.id)}>
+              Kaldır
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

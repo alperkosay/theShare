@@ -1,4 +1,4 @@
-/** This device's display identity: a random friendly name plus its type/OS. Nothing real is exposed. */
+/** This device's display identity: a chosen or random name plus its type/OS. Nothing real is exposed. */
 
 export type DeviceKind = 'phone' | 'tablet' | 'computer';
 export type DeviceOs = 'ios' | 'android' | 'windows' | 'macos' | 'linux' | 'other';
@@ -67,21 +67,30 @@ export function parseDeviceType(kind: unknown, os: unknown): Pick<DeviceInfo, 'k
   };
 }
 
-let self: DeviceInfo | null = null;
+/**
+ * Cleans a name received from another device: no control or bidi-override characters
+ * (which could make a name read as something else), bounded length.
+ */
+export function cleanPeerName(raw: unknown): string {
+  if (typeof raw !== 'string') return '';
+  return raw.replace(/[\u0000-\u001f\u007f-\u009f‎‏‪-‮⁦-⁩]/g, '').trim().slice(0, 40);
+}
 
-/** Stable for this tab (survives reloads via sessionStorage, never shared across tabs or persisted). */
+let self: DeviceInfo | null = null;
+let selfId: string | null = null;
+
+/** This device's identity. The name comes from the saved profile (hooks/useProfile); until it loads, a random one. */
 export function selfDevice(): DeviceInfo {
-  if (self) return self;
-  let name: string | null = null;
-  try {
-    name = sessionStorage.getItem('theshare-name');
-    if (!name) {
-      name = randomDeviceName();
-      sessionStorage.setItem('theshare-name', name);
-    }
-  } catch {
-    name ??= randomDeviceName();
-  }
-  self = { name, kind: detectDeviceKind(), os: detectDeviceOs() };
+  self ??= { name: randomDeviceName(), kind: detectDeviceKind(), os: detectDeviceOs() };
   return self;
+}
+
+/** Persistent random id, sent only over an established connection (never in nearby broadcasts). */
+export function selfDeviceId(): string | null {
+  return selfId;
+}
+
+export function setSelfIdentity(name: string, id: string): void {
+  self = { ...selfDevice(), name };
+  selfId = id;
 }

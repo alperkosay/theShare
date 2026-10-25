@@ -1,54 +1,63 @@
 /*
  * theShare design system
- * Dark-first "aurora glass": deep background, drifting colour fields, frosted
- * panels, violet→cyan accent gradient. Light theme keeps the same language.
+ * Quiet, Apple-like monochrome: neutral grey background, white cards (black in
+ * dark mode), black/white "ink" for primary actions, pill-shaped controls and
+ * soft pastels only as small accents (icon tiles, status, avatars). No
+ * gradients or glows. Follows the system light/dark setting.
  * All motion is transform/opacity only and switches off for reduced motion.
  */
 
 :root {
-  color-scheme: dark;
-  --bg: #06060c;
-  --glass: rgb(255 255 255 / 5.5%);
-  --glass-strong: rgb(255 255 255 / 9%);
-  --glass-border: rgb(255 255 255 / 11%);
-  --text: #eef0ff;
-  --muted: #9599bd;
-  --accent-1: #8b5cf6;
-  --accent-2: #22d3ee;
-  --accent-3: #f472b6;
-  --accent: #a78bfa;
-  --on-accent: #ffffff;
-  --grad: linear-gradient(135deg, var(--accent-1), var(--accent-2));
-  --ok: #34d399;
-  --error: #fb7185;
-  --error-bg: rgb(251 113 133 / 12%);
-  --glow: 0 12px 40px -12px rgb(139 92 246 / 70%);
-  --shadow: 0 20px 50px -24px rgb(0 0 0 / 70%);
-  --aurora-opacity: 0.55;
-  --radius: 22px;
+  color-scheme: light;
+  --bg: #f5f5f7;
+  /* Cards and raised surfaces. */
+  --glass: #ffffff;
+  /* Fills: secondary buttons, tracks, chips. */
+  --glass-strong: #ebebf0;
+  --glass-border: rgb(0 0 0 / 6%);
+  --text: #1d1d1f;
+  --muted: #6e6e73;
+  --accent: var(--text);
+  /* Primary actions: black on light, white on dark. */
+  --ink: #1d1d1f;
+  --on-ink: #ffffff;
+  --focus: rgb(0 0 0 / 35%);
+  --choice: var(--ink);
+  /* Pastel accents; text on them is always dark. */
+  --on-pastel: #1d1d1f;
+  --sky: #d9e8fb;
+  --mint: #d3f1e0;
+  --peach: #fde3cf;
+  --lemon: #fbf0c0;
+  --rose: #fdd9dd;
+  --ok: #2e8b57;
+  --error: #d1394a;
+  --error-bg: var(--rose);
+  --shadow: 0 0 0 0.5px rgb(0 0 0 / 3%), 0 1px 2px rgb(0 0 0 / 4%), 0 6px 16px -4px rgb(0 0 0 / 6%), 0 18px 36px -18px rgb(0 0 0 / 12%);
+  --veil: rgb(0 0 0 / 28%);
+  --radius: 24px;
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --font: 'Space Grotesk Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI Variable Text', 'Segoe UI', 'Helvetica Neue', Roboto, Arial, sans-serif;
 }
 
-@media (prefers-color-scheme: light) {
+@media (prefers-color-scheme: dark) {
   :root {
-    color-scheme: light;
-    --bg: #f3f3fa;
-    --glass: rgb(255 255 255 / 60%);
-    --glass-strong: rgb(255 255 255 / 85%);
-    --glass-border: rgb(30 27 75 / 9%);
-    --text: #15132b;
-    --muted: #5f6083;
-    --accent-1: #7c3aed;
-    --accent-2: #0891b2;
-    --accent: #6d28d9;
-    --ok: #059669;
-    --error: #e11d48;
-    --error-bg: rgb(225 29 72 / 8%);
-    --glow: 0 12px 32px -14px rgb(124 58 237 / 60%);
-    --shadow: 0 18px 40px -26px rgb(30 27 75 / 45%);
-    --aurora-opacity: 0.35;
+    color-scheme: dark;
+    --bg: #000000;
+    --glass: #1c1c1e;
+    --glass-strong: #2c2c2e;
+    --glass-border: rgb(255 255 255 / 7%);
+    --text: #f5f5f7;
+    --muted: #98989d;
+    --ink: #f5f5f7;
+    --on-ink: #000000;
+    --focus: rgb(255 255 255 / 45%);
+    --ok: #7fd8a4;
+    --error: #ff8a95;
+    --error-bg: rgb(253 217 221 / 14%);
+    --shadow: none;
+    --veil: rgb(0 0 0 / 55%);
   }
 }
 
@@ -67,7 +76,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font: 16px/1.5 var(--font);
-  font-feature-settings: 'ss01';
+  letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -87,66 +96,6 @@ input,
 textarea {
   font: inherit;
   color: inherit;
-}
-
-/* --- background: drifting aurora --- */
-
-.aurora {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.aurora span {
-  /* Soft by construction (radial gradients): no blur filter, so animating them stays cheap. */
-  position: absolute;
-  width: 70vmax;
-  height: 70vmax;
-  border-radius: 50%;
-  opacity: var(--aurora-opacity);
-  will-change: transform;
-}
-
-.aurora span:nth-child(1) {
-  top: -35vmax;
-  left: -25vmax;
-  background: radial-gradient(circle, var(--accent-1), transparent 65%);
-  animation: drift-a 22s ease-in-out infinite alternate;
-}
-
-.aurora span:nth-child(2) {
-  top: -20vmax;
-  right: -35vmax;
-  background: radial-gradient(circle, var(--accent-2), transparent 65%);
-  animation: drift-b 26s ease-in-out infinite alternate;
-}
-
-.aurora span:nth-child(3) {
-  bottom: -45vmax;
-  left: -10vmax;
-  background: radial-gradient(circle, var(--accent-3), transparent 65%);
-  opacity: calc(var(--aurora-opacity) * 0.6);
-  animation: drift-c 30s ease-in-out infinite alternate;
-}
-
-@keyframes drift-a {
-  to {
-    transform: translate(18vmax, 12vmax) scale(1.15);
-  }
-}
-
-@keyframes drift-b {
-  to {
-    transform: translate(-16vmax, 20vmax) scale(0.9);
-  }
-}
-
-@keyframes drift-c {
-  to {
-    transform: translate(14vmax, -14vmax) scale(1.1);
-  }
 }
 
 /* --- layout --- */
@@ -226,17 +175,11 @@ textarea {
 .eyebrow {
   font-size: 0.75rem;
   font-weight: 600;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--muted);
 }
 
-.gradient-text {
-  background: var(--grad);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
 
 /* --- glass surfaces --- */
 
@@ -289,8 +232,11 @@ textarea {
 }
 
 @keyframes pulse-glow {
-  50% {
-    box-shadow: 0 0 0 10px rgb(139 92 246 / 0%), var(--glow);
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--text) 18%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 14px transparent;
   }
 }
 
@@ -302,14 +248,42 @@ textarea {
   gap: 12px;
 }
 
-.brand img {
-  border-radius: 12px;
-  box-shadow: var(--glow);
+/* --- logo: pixel "send" arrow; the trail pixels pulse toward it, one column after another --- */
+
+.logo {
+  flex-shrink: 0;
+}
+
+.logo-tile {
+  fill: var(--ink);
+}
+
+.logo-pixels {
+  fill: var(--on-ink);
+}
+
+.logo .trail {
+  opacity: var(--a);
+  animation: pixel-flow 1.6s steps(3, jump-none) infinite;
+  animation-delay: calc(var(--c) * 0.14s);
+}
+
+@keyframes pixel-flow {
+  0%,
+  70%,
+  100% {
+    opacity: var(--a);
+  }
+  35% {
+    opacity: 1;
+  }
 }
 
 .brand h1 {
   font-size: 1.7rem;
+  font-weight: 700;
   line-height: 1.05;
+  letter-spacing: -0.03em;
 }
 
 /* --- buttons --- */
@@ -320,42 +294,36 @@ textarea {
   justify-content: center;
   gap: 8px;
   min-height: 46px;
-  padding: 10px 18px;
-  border: 1px solid var(--glass-border);
-  border-radius: 14px;
+  padding: 10px 20px;
+  border: 1px solid transparent;
+  border-radius: 999px;
   background: var(--glass-strong);
   font-weight: 600;
   cursor: pointer;
   transition:
     transform 0.18s var(--spring),
-    box-shadow 0.25s var(--ease),
     background 0.25s var(--ease),
     opacity 0.2s;
 }
 
 .btn:hover:not(:disabled) {
-  transform: translateY(-1px);
+  opacity: 0.85;
 }
 
 .btn:active:not(:disabled) {
-  transform: scale(0.96);
+  transform: scale(0.97);
 }
 
 .btn.primary {
   border-color: transparent;
-  background: var(--grad);
-  color: var(--on-accent);
-  box-shadow: var(--glow);
-}
-
-.btn.primary:hover:not(:disabled) {
-  box-shadow: 0 16px 44px -10px rgb(139 92 246 / 80%);
+  background: var(--ink);
+  color: var(--on-ink);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 10%), 0 6px 16px -8px color-mix(in srgb, var(--ink) 60%, transparent);
 }
 
 .btn.danger {
   color: var(--error);
   background: var(--error-bg);
-  border-color: transparent;
 }
 
 .btn.big {
@@ -366,9 +334,8 @@ textarea {
 
 .btn.small {
   min-height: 36px;
-  padding: 4px 12px;
+  padding: 4px 14px;
   font-size: 0.875rem;
-  border-radius: 12px;
 }
 
 .btn:disabled {
@@ -407,7 +374,7 @@ textarea {
 }
 
 :focus-visible {
-  outline: 2px solid var(--accent-2);
+  outline: 2px solid var(--focus);
   outline-offset: 3px;
 }
 
@@ -440,16 +407,14 @@ textarea {
   flex-shrink: 0;
   width: 44px;
   height: 44px;
-  border-radius: 15px;
+  border-radius: 50%;
   background: var(--glass-strong);
-  border: 1px solid var(--glass-border);
-  color: var(--accent);
+  color: var(--text);
 }
 
 .avatar.big {
   width: 64px;
   height: 64px;
-  border-radius: 20px;
 }
 
 .avatar.big .icon {
@@ -459,10 +424,11 @@ textarea {
 
 .avatar.danger {
   color: var(--error);
+  background: var(--error-bg);
 }
 
 .avatar.pulse {
-  animation: pulse-glow 2s ease-in-out infinite;
+  animation: pulse-glow 1.8s ease-out infinite;
 }
 
 .avatar .dot {
@@ -510,7 +476,7 @@ textarea {
   width: 30%;
   height: 30%;
   border-radius: 50%;
-  border: 1.5px solid var(--accent);
+  border: 1px solid color-mix(in srgb, var(--text) 35%, transparent);
   opacity: 0;
   animation: sonar 3s var(--ease) infinite;
   animation-delay: var(--d);
@@ -547,10 +513,10 @@ textarea {
   place-items: center;
   width: 66px;
   height: 66px;
-  border-radius: 22px;
-  background: var(--grad);
-  color: var(--on-accent);
-  box-shadow: var(--glow);
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--on-ink);
+  box-shadow: none;
   animation: float 5s ease-in-out infinite;
 }
 
@@ -608,8 +574,7 @@ textarea {
 
 .orbit-device:hover .orbit-bubble,
 .orbit-device:focus-visible .orbit-bubble {
-  transform: scale(1.1);
-  box-shadow: var(--glow);
+  transform: scale(1.06);
 }
 
 .orbit-device:active .orbit-bubble {
@@ -661,8 +626,10 @@ textarea {
   font-size: 1.05rem;
 }
 
+/* Cards in a row stretch to the same height; the buttons stay on the bottom edge. */
 .option .actions {
-  margin-top: 8px;
+  margin-top: auto;
+  padding-top: 10px;
 }
 
 .option-icon {
@@ -670,32 +637,48 @@ textarea {
   place-items: center;
   width: 42px;
   height: 42px;
-  border-radius: 14px;
-  background: var(--grad);
-  color: var(--on-accent);
-  box-shadow: var(--glow);
+  border-radius: 50%;
+  background: var(--sky);
+  color: var(--on-pastel);
+}
+
+.option + .option .option-icon {
+  background: var(--mint);
+}
+
+/* Third card: across the whole row, buttons side by side. */
+.option.wide {
+  grid-column: 1 / -1;
+}
+
+.options .option.wide .actions {
+  flex-direction: row;
+}
+
+.option.wide .option-icon {
+  background: var(--lemon);
 }
 
 /* --- dock --- */
 
 .dock {
-  --items: 3;
+  --items: 4;
   position: fixed;
   z-index: 20;
   left: 50%;
   bottom: max(14px, env(safe-area-inset-bottom));
   display: grid;
   grid-template-columns: repeat(var(--items), 1fr);
-  width: min(calc(100% - 32px), 380px);
+  width: min(calc(100% - 32px), 420px);
   padding: 6px;
-  border-radius: 26px;
-  background: var(--glass-strong);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--glass) 80%, transparent);
   border: 1px solid var(--glass-border);
-  box-shadow: var(--shadow);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 5%), 0 16px 40px -20px rgb(0 0 0 / 30%);
   transform: translateX(-50%);
   animation: dock-in 0.6s var(--spring) both;
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
-  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
 }
 
 @keyframes dock-in {
@@ -711,9 +694,8 @@ textarea {
   bottom: 6px;
   left: 6px;
   width: calc((100% - 12px) / var(--items));
-  border-radius: 20px;
-  background: var(--grad);
-  box-shadow: var(--glow);
+  border-radius: 999px;
+  background: var(--ink);
   transition: transform 0.45s var(--spring);
 }
 
@@ -735,7 +717,7 @@ textarea {
 }
 
 .dock-item.active {
-  color: var(--on-accent);
+  color: var(--on-ink);
 }
 
 .dock-item:active .dock-icon {
@@ -760,8 +742,8 @@ textarea {
   height: 18px;
   padding: 0 5px;
   border-radius: 9px;
-  background: var(--accent-3);
-  color: #fff;
+  background: var(--rose);
+  color: var(--on-pastel);
   font-size: 0.68rem;
   font-weight: 700;
   line-height: 18px;
@@ -779,7 +761,7 @@ textarea {
   align-items: flex-end;
   justify-content: center;
   padding: 16px;
-  background: rgb(0 0 0 / 40%);
+  background: var(--veil);
   animation: fade 0.3s ease both;
 }
 
@@ -797,10 +779,9 @@ textarea {
   width: min(100%, 440px);
   padding: 14px 20px calc(20px + env(safe-area-inset-bottom));
   text-align: center;
-  background: var(--glass-strong);
+  border-radius: 30px;
+  background: var(--glass);
   animation: sheet-up 0.5s var(--spring) both;
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
-  backdrop-filter: blur(24px) saturate(160%);
 }
 
 @keyframes sheet-up {
@@ -902,7 +883,7 @@ textarea {
   inset: 0;
   width: 40%;
   border-radius: 2px;
-  background: var(--grad);
+  background: var(--ink);
   animation: beam 1.6s ease-in-out infinite;
 }
 
@@ -968,7 +949,7 @@ textarea {
   gap: 6px;
   width: 100%;
   padding: 30px 16px;
-  border: 1.5px dashed color-mix(in srgb, var(--accent) 55%, transparent);
+  border: 1.5px dashed color-mix(in srgb, var(--text) 22%, transparent);
   border-radius: var(--radius);
   background: var(--glass);
   cursor: pointer;
@@ -980,9 +961,8 @@ textarea {
 
 .dropzone:hover:not(:disabled),
 .dropzone.over {
-  transform: scale(1.015);
-  border-color: var(--accent-2);
-  background: var(--glass-strong);
+  transform: scale(1.01);
+  border-color: color-mix(in srgb, var(--text) 45%, transparent);
 }
 
 .dropzone:disabled {
@@ -1000,10 +980,9 @@ textarea {
   width: 58px;
   height: 58px;
   margin-bottom: 4px;
-  border-radius: 20px;
-  background: var(--grad);
-  color: var(--on-accent);
-  box-shadow: var(--glow);
+  border-radius: 50%;
+  background: var(--sky);
+  color: var(--on-pastel);
 }
 
 .dropzone:not(:disabled) .dropzone-icon {
@@ -1024,11 +1003,12 @@ textarea {
   cursor: pointer;
 }
 
-/* The real checkbox sits invisibly on top of the drawn switch, so it stays clickable and focusable. */
+/* The real checkbox lies invisibly over the whole row (label + drawn switch): clickable anywhere, still focusable. */
 .check input {
   position: absolute;
-  width: 38px;
-  height: 22px;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   margin: 0;
   opacity: 0;
   cursor: pointer;
@@ -1039,9 +1019,8 @@ textarea {
   flex-shrink: 0;
   width: 38px;
   height: 22px;
-  border-radius: 11px;
+  border-radius: 999px;
   background: var(--glass-strong);
-  border: 1px solid var(--glass-border);
   transition: background 0.3s var(--ease);
 }
 
@@ -1050,25 +1029,25 @@ textarea {
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  background: var(--text);
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 25%);
   transition: transform 0.35s var(--spring);
 }
 
 .check input:checked + .switch {
-  background: var(--grad);
-  border-color: transparent;
+  background: var(--ink);
 }
 
 .check input:checked + .switch::after {
   transform: translateX(16px);
-  background: #fff;
+  background: var(--on-ink);
 }
 
 .check input:focus-visible + .switch {
-  outline: 2px solid var(--accent-2);
+  outline: 2px solid var(--focus);
   outline-offset: 3px;
 }
 
@@ -1088,26 +1067,28 @@ textarea {
   flex-shrink: 0;
   width: 38px;
   height: 38px;
-  border-radius: 13px;
+  border-radius: 50%;
   background: var(--glass-strong);
-  color: var(--accent);
+  color: var(--text);
 }
 
 .transfer.active .arrow,
 .transfer.finishing .arrow {
-  background: var(--grad);
-  color: var(--on-accent);
+  background: var(--ink);
+  color: var(--on-ink);
 }
 
 .transfer.done .arrow {
-  color: var(--ok);
+  background: var(--mint);
+  color: var(--on-pastel);
   animation: pop 0.5s var(--spring);
 }
 
 .transfer.failed .arrow,
 .transfer.cancelled .arrow,
 .transfer.rejected .arrow {
-  color: var(--error);
+  background: var(--rose);
+  color: var(--on-pastel);
 }
 
 .filename {
@@ -1127,26 +1108,9 @@ textarea {
   position: relative;
   height: 100%;
   border-radius: 999px;
-  background: var(--grad);
+  background: var(--ink);
   transition: width 0.3s var(--ease);
   overflow: hidden;
-}
-
-.progress-bar::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 45%), transparent);
-  animation: shimmer 1.4s ease-in-out infinite;
-}
-
-@keyframes shimmer {
-  from {
-    transform: translateX(-100%);
-  }
-  to {
-    transform: translateX(100%);
-  }
 }
 
 .files {
@@ -1189,8 +1153,8 @@ textarea {
   gap: 6px;
   max-width: 86%;
   padding: 11px 14px;
-  border-radius: 20px;
-  background: var(--glass-strong);
+  border-radius: 22px;
+  background: var(--glass);
   border: 1px solid var(--glass-border);
   animation: bubble-in 0.45s var(--spring) both;
 }
@@ -1199,9 +1163,8 @@ textarea {
   margin-left: auto;
   border-color: transparent;
   border-bottom-right-radius: 6px;
-  background: var(--grad);
-  color: var(--on-accent);
-  box-shadow: var(--glow);
+  background: var(--ink);
+  color: var(--on-ink);
   transform-origin: bottom right;
 }
 
@@ -1238,7 +1201,7 @@ textarea {
 
 .bubble.out .muted,
 .bubble.out .link {
-  color: rgb(255 255 255 / 85%);
+  color: color-mix(in srgb, var(--on-ink) 75%, transparent);
 }
 
 .composer {
@@ -1249,17 +1212,15 @@ textarea {
   flex-direction: column;
   gap: 8px;
   padding: 10px 12px;
-  border-radius: 22px;
-  background: var(--glass-strong);
+  border-radius: 26px;
+  background: var(--glass);
   border: 1px solid var(--glass-border);
   box-shadow: var(--shadow);
   transition: border-color 0.25s;
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
-  backdrop-filter: blur(24px) saturate(160%);
 }
 
 .composer:focus-within {
-  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  border-color: color-mix(in srgb, var(--text) 35%, transparent);
 }
 
 .composer textarea {
@@ -1293,7 +1254,7 @@ textarea {
   width: 100%;
   padding: 16px;
   border: 1px solid var(--glass-border);
-  border-radius: 18px;
+  border-radius: 22px;
   background: var(--glass);
   font-size: 2.2rem;
   font-weight: 700;
@@ -1307,8 +1268,7 @@ textarea {
 
 .code-input:focus-visible {
   outline: none;
-  border-color: var(--accent);
-  box-shadow: var(--glow);
+  border-color: color-mix(in srgb, var(--text) 45%, transparent);
 }
 
 .qr {
@@ -1319,6 +1279,19 @@ textarea {
   padding: 10px;
   border-radius: 18px;
   background: #fff;
+}
+
+/* QR stream (zero connection): bigger than the pairing QR, its codes are denser. */
+.qr-stream {
+  display: block;
+  width: 100%;
+  max-width: 420px;
+  aspect-ratio: 1;
+  margin: 0 auto;
+  padding: 10px;
+  border-radius: 18px;
+  background: #fff;
+  image-rendering: pixelated;
 }
 
 .qr-mini .qr {
@@ -1344,7 +1317,6 @@ textarea {
   border-radius: 24px;
   overflow: hidden;
   background: #000;
-  box-shadow: var(--glow);
 }
 
 .scanner-view video {
@@ -1366,8 +1338,7 @@ textarea {
   left: 6%;
   right: 6%;
   height: 2px;
-  background: var(--accent-2);
-  box-shadow: 0 0 12px var(--accent-2);
+  background: #fff;
   animation: scan 2.2s ease-in-out infinite alternate;
 }
 
@@ -1390,15 +1361,13 @@ textarea {
 /* --- notices & loaders --- */
 
 .notice {
-  padding: 10px 14px;
-  border-radius: 14px;
+  padding: 10px 16px;
+  border-radius: 18px;
   background: var(--glass-strong);
-  border: 1px solid var(--glass-border);
 }
 
 .notice.error {
   background: var(--error-bg);
-  border-color: transparent;
   color: var(--error);
 }
 
@@ -1422,8 +1391,7 @@ textarea {
   width: 11px;
   height: 11px;
   border-radius: 50%;
-  background: var(--grad);
-  box-shadow: var(--glow);
+  background: var(--ink);
 }
 
 .orbit-loader span:nth-child(1) {
@@ -1448,7 +1416,7 @@ textarea {
   height: 14px;
   border-radius: 50%;
   border: 2px solid var(--glass-border);
-  border-top-color: var(--accent);
+  border-top-color: var(--text);
   animation: spin 0.8s linear infinite;
 }
 
@@ -1485,19 +1453,1013 @@ textarea {
   align-items: center;
   gap: 8px;
   width: min(calc(100% - 32px), 420px);
-  padding: 10px 14px;
-  border-radius: 18px;
-  background: var(--glass-strong);
+  padding: 8px 8px 8px 18px;
+  border-radius: 999px;
+  background: var(--glass);
   border: 1px solid var(--glass-border);
-  box-shadow: var(--shadow);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 5%), 0 16px 40px -20px rgb(0 0 0 / 30%);
   transform: translateX(-50%);
   animation: rise 0.45s var(--spring) both;
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
-  backdrop-filter: blur(24px) saturate(160%);
 }
 
 .toast span {
   flex: 1;
+}
+
+/* --- profile & settings --- */
+
+.profile-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 45%;
+  padding: 4px 12px 4px 4px;
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  background: var(--glass);
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: transform 0.18s var(--spring);
+}
+
+.profile-chip:active {
+  transform: scale(0.96);
+}
+
+.profile-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.me-avatar {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  /* Pastel tint of the profile's hue. */
+  background: hsl(var(--hue) 70% 86%);
+  color: var(--on-pastel);
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.me-avatar.big {
+  width: 56px;
+  height: 56px;
+  font-size: 1.5rem;
+}
+
+.text-input,
+select {
+  min-height: 46px;
+  padding: 10px 18px;
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  background: var(--glass);
+  transition: border-color 0.25s;
+}
+
+select {
+  min-height: 38px;
+  padding: 6px 14px;
+  border-color: transparent;
+  background: var(--glass-strong);
+  font-weight: 600;
+}
+
+.text-input:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--text) 45%, transparent);
+}
+
+/* Forms and details in a sheet: left-aligned, scrollable when taller than the screen. */
+.sheet.form {
+  align-items: stretch;
+  gap: 12px;
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  text-align: left;
+}
+
+.sheet.form .sheet-grip {
+  align-self: center;
+}
+
+.sheet.form h2 {
+  font-size: 1.1rem;
+}
+
+.sheet.form .eyebrow {
+  margin-top: 8px;
+  font-size: 0.75rem;
+}
+
+.check.setting {
+  justify-content: flex-start;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.check.setting .switch {
+  margin-top: 2px;
+}
+
+.setting-select {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* --- history tab --- */
+
+.tab-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tab-header .title {
+  font-size: 1.5rem;
+  text-align: left;
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--glass-strong);
+}
+
+.segmented button {
+  min-height: 34px;
+  border: none;
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition:
+    background 0.25s var(--ease),
+    color 0.25s;
+}
+
+.segmented button.active {
+  background: var(--glass);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 12%);
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--glass-strong);
+  color: var(--muted);
+}
+
+.search:focus-within {
+  border-color: color-mix(in srgb, var(--text) 45%, transparent);
+}
+
+.search input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  border: none;
+  background: none;
+  outline: none;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 0;
+  border-radius: 20px;
+}
+
+.history-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.history-row + .history-row {
+  border-top: 1px solid var(--glass-border);
+}
+
+.history-row:active {
+  background: var(--glass-strong);
+}
+
+.history-row .arrow.done {
+  background: var(--mint);
+  color: var(--on-pastel);
+}
+
+.history-row .arrow.failed,
+.history-row .arrow.cancelled,
+.history-row .arrow.rejected {
+  background: var(--rose);
+  color: var(--on-pastel);
+}
+
+.ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-status {
+  flex-shrink: 0;
+  color: var(--ok);
+  font-weight: 600;
+}
+
+.history-status.failed,
+.history-status.cancelled,
+.history-status.rejected {
+  color: var(--error);
+}
+
+.history-text {
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--glass);
+}
+
+.pending {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 20px;
+}
+
+/* --- previews --- */
+
+.thumb {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  background: var(--glass-strong);
+  color: var(--text);
+  cursor: zoom-in;
+  transition: transform 0.18s var(--spring);
+}
+
+.thumb.sm {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+}
+
+.thumb:active {
+  transform: scale(0.94);
+}
+
+.thumb img,
+.thumb video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.thumb-badge {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 55%);
+  color: #fff;
+}
+
+.thumb-badge .icon {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+
+.viewer {
+  position: fixed;
+  z-index: 40;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: rgb(4 4 10 / 94%);
+  color: #eef0ff;
+  animation: fade 0.25s ease both;
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+
+.viewer-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: max(12px, env(safe-area-inset-top)) 16px 12px;
+}
+
+.viewer-bar .muted {
+  color: #9599bd;
+}
+
+.viewer-bar .btn:not(.primary) {
+  color: #eef0ff;
+  background: rgb(255 255 255 / 10%);
+  border-color: rgb(255 255 255 / 12%);
+}
+
+.viewer-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 0 16px calc(16px + env(safe-area-inset-bottom));
+}
+
+.viewer-stage img,
+.viewer-stage video {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 12px;
+  object-fit: contain;
+  animation: pop 0.4s var(--spring) both;
+}
+
+.viewer-nav {
+  position: absolute;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 12%);
+  color: #fff;
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.viewer-nav.prev {
+  left: 12px;
+}
+
+.viewer-nav.next {
+  right: 12px;
+}
+
+/* --- theme picker (settings) --- */
+
+.theme-picker {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.theme-option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 8px 12px;
+  border: 2px solid transparent;
+  border-radius: 22px;
+  background: var(--glass-strong);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.2s,
+    transform 0.18s var(--spring);
+}
+
+.theme-option:active {
+  transform: scale(0.97);
+}
+
+.theme-option.active {
+  border-color: var(--choice);
+}
+
+/* The radio mark: an empty ring, filled with a dot when selected. */
+.theme-radio {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border: 2px solid color-mix(in srgb, var(--muted) 70%, transparent);
+  border-radius: 50%;
+  background: var(--glass);
+  transition:
+    border-color 0.2s,
+    background 0.2s;
+}
+
+.theme-option.active .theme-radio {
+  border-color: var(--choice);
+  background: var(--choice);
+  box-shadow: inset 0 0 0 4px var(--glass);
+}
+
+.theme-option .small {
+  padding: 0 6px;
+}
+
+.theme-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 0 6px;
+}
+
+/* Fixed colours on purpose: each swatch shows its own theme, whichever is active. */
+.theme-swatch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr auto;
+  gap: 5px;
+  height: 64px;
+  margin-bottom: 6px;
+  padding: 7px;
+  border-radius: 16px;
+}
+
+.theme-swatch span {
+  border-radius: 9px;
+}
+
+.theme-swatch span:nth-child(3) {
+  grid-column: 1 / -1;
+  height: 14px;
+  border-radius: 999px;
+}
+
+.theme-option.mono .theme-swatch {
+  background: #f5f5f7;
+}
+
+.theme-option.mono .theme-swatch span {
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
+}
+
+.theme-option.mono .theme-swatch span:nth-child(3) {
+  background: #1d1d1f;
+}
+
+.theme-option.pastel .theme-swatch {
+  background: #f2f5fa;
+}
+
+.theme-option.pastel .theme-swatch span:nth-child(1) {
+  background: #ffe1cc;
+}
+
+.theme-option.pastel .theme-swatch span:nth-child(2) {
+  background: #cdf3e0;
+}
+
+.theme-option.pastel .theme-swatch span:nth-child(3) {
+  background: #9cc4ff;
+}
+
+.theme-option.soft .theme-swatch {
+  background: #e4e9f1;
+}
+
+.theme-option.soft .theme-swatch span {
+  background: #e4e9f1;
+  box-shadow: 2px 2px 4px #c3cbd8, -2px -2px 4px #ffffff;
+}
+
+.theme-option.soft .theme-swatch span:nth-child(3) {
+  background: #8fbcff;
+}
+
+/* =========================================================================
+ * Alternative theme: "Pastel" (Profil → Görünüm)
+ * Soft UI / playful minimalism: a tinted background, pastel-filled cards,
+ * soft coloured shadows, extra-round corners and the rounded system font.
+ * Same components as the default theme; only tokens and a few fills change.
+ * ========================================================================= */
+
+:root[data-theme='pastel'] {
+  color-scheme: light;
+  --bg: #f2f5fa;
+  --glass: #ffffff;
+  --glass-strong: #e9eef7;
+  --glass-border: rgb(40 70 120 / 6%);
+  --text: #253047;
+  --muted: #717c92;
+  --ink: #253047;
+  --on-ink: #ffffff;
+  --focus: rgb(70 130 230 / 55%);
+  --on-pastel: #253047;
+  --sky: #d6e7ff;
+  --mint: #cdf3e0;
+  --peach: #ffe1cc;
+  --lemon: #fff1b8;
+  --rose: #ffd6de;
+  /* The one stronger pastel: dock pill, switches, progress. */
+  --blue: #9cc4ff;
+  --choice: #3f86e8;
+  --ok: #2f9467;
+  --error: #d6455d;
+  --error-bg: var(--rose);
+  --shadow: 0 1px 2px rgb(37 48 71 / 5%), 0 8px 18px -8px rgb(60 90 140 / 14%), 0 20px 40px -20px rgb(60 90 140 / 18%);
+  --veil: rgb(37 48 71 / 30%);
+  --radius: 28px;
+  --font: ui-rounded, 'SF Pro Rounded', -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Display', 'Segoe UI', 'Helvetica Neue', Roboto, Arial, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme='pastel'] {
+    color-scheme: dark;
+    --bg: #10151d;
+    --glass: #1b2230;
+    --glass-strong: #263042;
+    --glass-border: rgb(255 255 255 / 6%);
+    --text: #eef3fb;
+    --muted: #9eaabf;
+    --ink: #d6e7ff;
+    --on-ink: #1b2230;
+    --focus: rgb(156 196 255 / 70%);
+    --ok: #86dcb0;
+    --error: #ff8fa3;
+    --error-bg: rgb(255 214 222 / 14%);
+    --shadow: 0 1px 2px rgb(0 0 0 / 30%), 0 16px 36px -18px rgb(0 0 0 / 65%);
+    --veil: rgb(0 0 0 / 55%);
+  }
+}
+
+:root[data-theme='pastel'] .glass {
+  border-color: transparent;
+}
+
+/* Each pastel card casts a shadow in a deeper shade of its own colour (light mode; dark mode keeps plain shadows). */
+@media (prefers-color-scheme: light) {
+  :root[data-theme='pastel'] :is(.option, .radar-card, .peer-bar, .link-hero, .dropzone, .pending, .empty) {
+    box-shadow:
+      0 1px 2px rgb(37 48 71 / 5%),
+      0 10px 22px -10px var(--tint-shadow),
+      0 22px 44px -22px var(--tint-shadow);
+  }
+
+  :root[data-theme='pastel'] .option,
+  :root[data-theme='pastel'] .empty {
+    --tint-shadow: rgb(225 135 80 / 38%);
+  }
+
+  :root[data-theme='pastel'] .option + .option,
+  :root[data-theme='pastel'] .peer-bar {
+    --tint-shadow: rgb(60 170 115 / 34%);
+  }
+
+  :root[data-theme='pastel'] :is(.radar-card, .link-hero) {
+    --tint-shadow: rgb(70 130 220 / 34%);
+  }
+
+  :root[data-theme='pastel'] :is(.dropzone, .pending) {
+    --tint-shadow: rgb(215 170 40 / 34%);
+  }
+
+  :root[data-theme='pastel'] :is(.peer-bar, .link-hero).off {
+    --tint-shadow: rgb(225 95 120 / 34%);
+  }
+}
+
+/* Pastel-filled cards: dark text and translucent white fills inside, in light and dark mode alike. */
+:root[data-theme='pastel'] :is(.option, .radar-card, .peer-bar, .link-hero, .dropzone, .pending, .empty) {
+  --text: var(--on-pastel);
+  --muted: rgb(37 48 71 / 62%);
+  --glass-strong: rgb(255 255 255 / 62%);
+  --glass-border: rgb(37 48 71 / 8%);
+  --ink: #253047;
+  --on-ink: #ffffff;
+  --error: #c23650;
+  --error-bg: rgb(255 255 255 / 62%);
+  color: var(--text);
+}
+
+:root[data-theme='pastel'] .option {
+  background: var(--peach);
+}
+
+:root[data-theme='pastel'] .option + .option {
+  background: var(--mint);
+}
+
+:root[data-theme='pastel'] .option.wide {
+  --tint-shadow: rgb(215 170 40 / 34%);
+  background: var(--lemon);
+}
+
+:root[data-theme='pastel'] .option .option-icon {
+  background: rgb(255 255 255 / 75%);
+}
+
+:root[data-theme='pastel'] .radar-card,
+:root[data-theme='pastel'] .link-hero {
+  background: var(--sky);
+}
+
+:root[data-theme='pastel'] .peer-bar {
+  background: var(--mint);
+}
+
+:root[data-theme='pastel'] .peer-bar.off,
+:root[data-theme='pastel'] .link-hero.off {
+  background: var(--rose);
+}
+
+:root[data-theme='pastel'] .dropzone {
+  border: 2px dashed rgb(37 48 71 / 16%);
+  background: var(--lemon);
+}
+
+:root[data-theme='pastel'] .dropzone-icon {
+  background: #ffffff;
+}
+
+:root[data-theme='pastel'] .pending {
+  background: var(--lemon);
+}
+
+:root[data-theme='pastel'] .empty {
+  background: var(--peach);
+}
+
+:root[data-theme='pastel'] .dock-pill,
+:root[data-theme='pastel'] .check input:checked + .switch,
+:root[data-theme='pastel'] .progress-bar {
+  background: var(--blue);
+}
+
+:root[data-theme='pastel'] .btn.primary {
+  box-shadow: 0 2px 4px rgb(37 48 71 / 10%), 0 10px 22px -10px rgb(37 48 71 / 45%);
+}
+
+:root[data-theme='pastel'] .dock-item.active {
+  color: var(--on-pastel);
+}
+
+:root[data-theme='pastel'] .check input:checked + .switch::after {
+  background: #ffffff;
+}
+
+:root[data-theme='pastel'] :is(.transfer.active, .transfer.finishing) .arrow {
+  background: var(--blue);
+  color: var(--on-pastel);
+}
+
+:root[data-theme='pastel'] .bubble.out {
+  background: var(--sky);
+  color: var(--on-pastel);
+}
+
+:root[data-theme='pastel'] .bubble.out :is(.muted, .link) {
+  color: rgb(37 48 71 / 65%);
+}
+
+
+/* =========================================================================
+ * Alternative theme: "Soft" (Profil → Görünüm)
+ * Soft UI / neumorphism: surfaces share the background colour and are shaped
+ * only by a light (top-left) and a dark (bottom-right) shadow. What you can
+ * press looks raised; fields, wells and the selected state look pressed in.
+ * Colour is kept to one blue accent and pastel status tints.
+ * ========================================================================= */
+
+:root[data-theme='soft'] {
+  color-scheme: light;
+  --bg: #e4e9f1;
+  --glass: #e4e9f1;
+  --glass-strong: #e4e9f1;
+  --glass-border: rgb(40 60 100 / 7%);
+  --text: #2e3a4f;
+  --muted: #7b879b;
+  --ink: #2e3a4f;
+  --on-ink: #ffffff;
+  --focus: rgb(60 130 230 / 55%);
+  --on-pastel: #24324a;
+  --sky: #d3e5ff;
+  --mint: #cfeedd;
+  --rose: #f9d3da;
+  --blue: #8fbcff;
+  --blue-text: #2f73d9;
+  --choice: var(--blue-text);
+  --ok: #2f8f63;
+  --error: #c9435a;
+  --error-bg: var(--bg);
+  /*
+   * Raised out of the background, lit from the top-left:
+   *  - Cards are exactly the background colour, so nothing but light and
+   *    shadow separates them from it: they read as part of the surface.
+   *  - One balanced pair of solid shadows, same offset and blur on both
+   *    sides: the background darkened ~15% below-right, white above-left.
+   *  - Only small controls get a faint dome (±1%), so they feel pressable.
+   *  - Wells are flat and a shade darker: less light reaches into them.
+   */
+  --surface: linear-gradient(145deg, #e8edf5, #e0e5ed);
+  --well: #e0e5ed;
+  --light: #ffffff;
+  --dark: #bec6d3;
+  --raise: 6px 6px 13px var(--dark), -6px -6px 13px var(--light);
+  --raise-sm: 3px 3px 7px var(--dark), -3px -3px 7px var(--light);
+  --inset: inset 3px 3px 6px var(--dark), inset -3px -3px 6px var(--light);
+  --shadow: var(--raise);
+  --veil: rgb(46 58 79 / 22%);
+  --radius: 26px;
+  --font: ui-rounded, 'SF Pro Rounded', -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Display', 'Segoe UI', 'Helvetica Neue', Roboto, Arial, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme='soft'] {
+    color-scheme: dark;
+    --bg: #252a33;
+    --glass: #252a33;
+    --glass-strong: #252a33;
+    --glass-border: rgb(255 255 255 / 6%);
+    --text: #e8edf5;
+    --muted: #93a0b4;
+    --ink: #e8edf5;
+    --on-ink: #252a33;
+    --blue-text: #9cc4ff;
+    --ok: #8fdcb4;
+    --error: #ff9aab;
+    --surface: linear-gradient(145deg, #282d37, #22272f);
+    --well: #22262e;
+    --light: #313744;
+    --dark: #191c22;
+    --veil: rgb(0 0 0 / 45%);
+  }
+}
+
+/* A little more air than the other themes, so each raised surface stands on its own. */
+:root[data-theme='soft'] .screen {
+  gap: 22px;
+  padding-left: 18px;
+  padding-right: 18px;
+}
+
+:root[data-theme='soft'] :is(.options, section.stack, .page) {
+  gap: 18px;
+}
+
+:root[data-theme='soft'] :is(.option, .transfer) {
+  padding: 20px;
+}
+
+:root[data-theme='soft'] .sheet.form {
+  gap: 16px;
+  padding-left: 24px;
+  padding-right: 24px;
+}
+
+:root[data-theme='soft'] .history-list {
+  padding: 8px 0;
+}
+
+/*
+ * Shaded surfaces paint under their (transparent) border too. Otherwise the
+ * gradient restarts there and draws a hard 1px line around every edge.
+ */
+:root[data-theme='soft'] * {
+  background-origin: border-box;
+}
+
+/* Raised: cards and floating bars. */
+:root[data-theme='soft'] :is(.glass, .panel, .sheet, .dock, .toast) {
+  border-color: transparent;
+  background: var(--bg);
+  box-shadow: var(--raise);
+}
+
+:root[data-theme='soft'] .dock {
+  column-gap: 10px;
+  padding: 8px 10px;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* Raised, smaller: buttons and round tiles. */
+:root[data-theme='soft'] :is(.btn, .avatar, .arrow, .option-icon, .dropzone-icon, .orbit-bubble, .thumb, .theme-option, .profile-chip) {
+  border-color: transparent;
+  background: var(--surface);
+  box-shadow: var(--raise-sm);
+}
+
+:root[data-theme='soft'] :is(.avatar, .arrow, .option-icon, .dropzone-icon, .orbit-bubble) {
+  color: var(--blue-text);
+}
+
+:root[data-theme='soft'] :is(.btn, .theme-option, .profile-chip, .dropzone) {
+  transition:
+    box-shadow 0.18s var(--ease),
+    background 0.25s var(--ease),
+    opacity 0.2s;
+}
+
+:root[data-theme='soft'] .btn:hover:not(:disabled) {
+  opacity: 1;
+}
+
+/* Pressing pushes the surface in. */
+:root[data-theme='soft'] :is(.btn, .theme-option, .profile-chip):active:not(:disabled) {
+  transform: none;
+  background: var(--well);
+  box-shadow: var(--inset);
+}
+
+/* Primary: a blue fill shaped like the rest, with a light rim on top; pressing pushes it in. */
+:root[data-theme='soft'] .btn.primary {
+  background: linear-gradient(145deg, #a4c9ff, #84b2f6);
+  color: var(--on-pastel);
+  box-shadow: var(--raise-sm);
+}
+
+:root[data-theme='soft'] .btn.primary:active:not(:disabled) {
+  background: linear-gradient(145deg, #80aef2, #9cc4ff);
+  box-shadow: inset 3px 3px 7px rgb(20 50 100 / 25%), inset -2px -2px 5px rgb(255 255 255 / 30%);
+}
+
+:root[data-theme='soft'] .btn.danger {
+  color: var(--error);
+}
+
+:root[data-theme='soft'] .btn:disabled {
+  opacity: 0.55;
+}
+
+/* Pressed in: fields, wells, tracks. */
+:root[data-theme='soft'] :is(textarea, .text-input, select, .code-input, .search, .segmented, .notice, .sec-code, .progress, .switch, .dropzone) {
+  border-color: transparent;
+  background: var(--well);
+  box-shadow: var(--inset);
+}
+
+:root[data-theme='soft'] .composer textarea {
+  background: transparent;
+  box-shadow: none;
+}
+
+:root[data-theme='soft'] .dropzone {
+  border: none;
+}
+
+:root[data-theme='soft'] .dropzone:hover:not(:disabled),
+:root[data-theme='soft'] .dropzone.over {
+  transform: none;
+  background: var(--surface);
+  box-shadow: var(--raise);
+}
+
+/* Selected: raised out of its well (segments) or pressed in (theme cards, dock). */
+:root[data-theme='soft'] .segmented button.active {
+  background: var(--surface);
+  color: var(--blue-text);
+  box-shadow: var(--raise-sm);
+}
+
+:root[data-theme='soft'] .theme-option.active {
+  border-color: transparent;
+  background: var(--well);
+  box-shadow: var(--inset);
+}
+
+:root[data-theme='soft'] .theme-radio {
+  border-color: transparent;
+  background: var(--well);
+  box-shadow: var(--inset);
+}
+
+:root[data-theme='soft'] .theme-option.active .theme-radio {
+  background: var(--choice);
+  box-shadow: inset 0 0 0 5px var(--bg), var(--raise-sm);
+}
+
+/* No sliding pill: the active tab is pressed into the dock right where it is. */
+:root[data-theme='soft'] .dock-pill {
+  display: none;
+}
+
+:root[data-theme='soft'] .dock-item {
+  border-radius: 999px;
+  transition:
+    box-shadow 0.2s var(--ease),
+    background 0.2s var(--ease),
+    color 0.2s var(--ease);
+}
+
+:root[data-theme='soft'] .dock-item.active,
+:root[data-theme='soft'] .dock-item:active {
+  background: var(--well);
+  box-shadow: var(--inset);
+}
+
+:root[data-theme='soft'] .dock-item.active {
+  color: var(--blue-text);
+}
+
+:root[data-theme='soft'] .dock-item.active .dock-icon {
+  animation: none;
+}
+
+:root[data-theme='soft'] .check input:checked + .switch,
+:root[data-theme='soft'] .progress-bar {
+  background: var(--blue);
+}
+
+:root[data-theme='soft'] .check input:checked + .switch {
+  box-shadow: inset 2px 2px 5px rgb(20 50 100 / 22%);
+}
+
+:root[data-theme='soft'] .switch::after,
+:root[data-theme='soft'] .check input:checked + .switch::after {
+  background: var(--surface);
+  box-shadow: 2px 2px 4px var(--dark), -1px -1px 3px var(--light);
+}
+
+:root[data-theme='soft'] .radar-self {
+  background: var(--surface);
+  color: var(--blue-text);
+  box-shadow: var(--raise);
+}
+
+:root[data-theme='soft'] .radar .ring {
+  border-color: color-mix(in srgb, var(--blue-text) 35%, transparent);
+}
+
+/* Status keeps a pastel tint, still shaped like everything else. */
+:root[data-theme='soft'] .transfer.done .arrow,
+:root[data-theme='soft'] .history-row .arrow.done {
+  background: var(--mint);
+  color: var(--on-pastel);
+}
+
+:root[data-theme='soft'] :is(.transfer.failed, .transfer.cancelled, .transfer.rejected) .arrow,
+:root[data-theme='soft'] .history-row :is(.arrow.failed, .arrow.cancelled, .arrow.rejected) {
+  background: var(--rose);
+  color: var(--on-pastel);
+}
+
+:root[data-theme='soft'] :is(.transfer.active, .transfer.finishing) .arrow {
+  background: var(--blue);
+  color: var(--on-pastel);
+}
+
+:root[data-theme='soft'] .bubble.in {
+  border-color: transparent;
+  background: var(--surface);
+  box-shadow: var(--raise-sm);
+}
+
+:root[data-theme='soft'] .bubble.out {
+  background: var(--sky);
+  color: var(--on-pastel);
+  box-shadow: var(--raise-sm);
+}
+
+:root[data-theme='soft'] .bubble.out :is(.muted, .link) {
+  color: rgb(36 50 74 / 65%);
+}
+
+:root[data-theme='soft'] .me-avatar {
+  box-shadow: var(--raise-sm);
+}
+
+:root[data-theme='soft'] :is(.peer-bar, .link-hero).off {
+  box-shadow: var(--raise), inset 0 0 0 2px color-mix(in srgb, var(--error) 35%, transparent);
+}
+
+:root[data-theme='soft'] .qr {
+  box-shadow: var(--raise-sm);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1511,8 +2473,8 @@ textarea {
 }
 
 /* While a transfer runs, park the purely decorative loops so the CPU/GPU goes to the transfer. */
-.app.busy .aurora span,
 .app.busy .orbit-track,
+.app.busy .logo .trail,
 .app.busy .radar-self,
 .app.busy .dropzone-icon,
 .app.busy .beam span {

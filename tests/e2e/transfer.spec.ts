@@ -26,9 +26,13 @@ async function expectConnected(host: Page, joiner: Page): Promise<void> {
   await expect(host.getByTestId('pairing-code')).toHaveText(await joiner.getByTestId('pairing-code').innerText());
 }
 
-/** Pairs two pages with the offline QR flow (codes pasted as text). No internet needed. */
-async function pair(host: Page, joiner: Page): Promise<void> {
-  await host.goto('/');
+/**
+ * Pairs two pages with the offline QR flow (codes pasted as text). No internet needed.
+ * `reload: false` keeps the host page as it is (e.g. to keep its in-memory pending queue).
+ */
+async function pair(host: Page, joiner: Page, { reload = true } = {}): Promise<void> {
+  if (reload) await host.goto('/');
+  else await host.getByTestId('tab-devices').click();
   await host.getByTestId('qr-host').click();
   const offer = await readCode(host, /#s=TS[1Z]\./);
 
@@ -279,4 +283,112 @@ test('Chromium ↔ Firefox interop', async ({ browser, playwright }) => {
   } finally {
     await firefox.close();
   }
+});
+
+test('name, history, resend after reconnecting (via the pending queue) and reset', async ({ browser }) => {
+  const { a: host, b: joiner } = await twoDevices(browser);
+
+  // A random name until changed from the profile; the other side sees the new one.
+  await host.goto('/');
+  await host.getByTestId('profile-chip').click();
+  await host.getByTestId('name-input').fill('Alper 👋');
+  await host.getByTestId('name-save').click();
+  await host.keyboard.press('Escape');
+  await expect(host.getByTestId('profile-chip')).toContainText('Alper 👋');
+  await pair(host, joiner); // reloads: the name is persisted
+  await expect(joiner.getByTestId('peer-name')).toHaveText('Alper 👋');
+
+  const file = { name: 'rapor.bin', buffer: randomBytes(300 * 1024) };
+  await transferFiles(host, joiner, [file]);
+
+  // Both sides have it in their history, with time and the other device's type.
+  await host.getByTestId('tab-history').click();
+  const sent = host.locator('[data-testid=history-row][data-direction=out]').first();
+  await expect(sent).toContainText('rapor.bin');
+  await expect(sent).toContainText(/\d{2}:\d{2}/);
+  await expect(sent).toContainText('Windows bilgisayar');
+  await joiner.getByTestId('tab-history').click();
+  await expect(joiner.locator('[data-testid=history-row][data-direction=in]').first()).toContainText('Alper 👋');
+
+  // It survives a reload.
+  await host.reload();
+  await host.getByTestId('tab-history').click();
+  await expect(host.getByTestId('history-row')).toHaveCount(1);
+
+  // Not connected: "resend" queues it; it goes out by itself on the next connection.
+  await host.getByTestId('history-row').first().click();
+  await expect(host.getByTestId('resend')).toHaveText(/Bağlanınca gönder/);
+  await host.getByTestId('resend').click();
+  await expect(host.getByTestId('pending')).toContainText('rapor.bin');
+  await pair(host, joiner, { reload: false });
+  const incoming = joiner.locator('[data-testid=transfer][data-direction=in]').first();
+  await incoming.getByTestId('accept').click();
+  await expect(incoming).toHaveAttribute('data-status', 'done', { timeout: 30_000 });
+  const [download] = await Promise.all([joiner.waitForEvent('download'), incoming.getByTestId('download').click()]);
+  expect(sha256(await readFile((await download.path())!))).toBe(sha256(file.buffer));
+  await expect(host.getByTestId('pending')).toHaveCount(0);
+
+  // "Reset everything" leaves nothing behind.
+  await host.getByTestId('tab-history').click();
+  await expect(host.getByTestId('history-row')).toHaveCount(2);
+  await host.getByTestId('profile-chip').click();
+  host.once('dialog', (d) => void d.accept());
+  await host.getByTestId('reset-all').click();
+  await expect(host.getByTestId('profile-chip')).not.toContainText('Alper');
+  await host.keyboard.press('Escape');
+  await expect(host.getByTestId('history-row')).toHaveCount(0);
+  const stored = await host.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const req = indexedDB.open('theshare');
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    const count = (store: string) =>
+      new Promise<number>((resolve) => {
+        const req = db.transaction(store).objectStore(store).count();
+        req.onsuccess = () => resolve(req.result);
+      });
+    return { history: await count('history'), files: await count('files') };
+  });
+  expect(stored).toEqual({ history: 0, files: 0 });
+});
+
+test('received images get a thumbnail that opens a full-screen preview', async ({ browser }) => {
+  const { a: host, b: joiner } = await twoDevices(browser);
+  await pair(host, joiner);
+  // 1×1 PNG, sent with a misleading name and type: previews go by content.
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+  await host.getByTestId('file-input').setInputFiles([
+    { name: 'foto.dat', mimeType: 'application/octet-stream', buffer: png },
+    { name: 'not.txt', mimeType: 'text/plain', buffer: Buffer.from('metin') },
+  ]);
+  const incoming = joiner.locator('[data-testid=transfer][data-direction=in]').first();
+  await incoming.getByTestId('accept').click();
+  await expect(incoming).toHaveAttribute('data-status', 'done');
+
+  await expect(incoming.getByTestId('thumb')).toHaveCount(1); // only the image
+  await incoming.getByTestId('thumb').click();
+  const viewer = joiner.getByTestId('viewer');
+  await expect(viewer.locator('img')).toHaveJSProperty('naturalWidth', 1);
+  await expect(viewer).toContainText('foto.dat');
+  await joiner.getByTestId('viewer-close').click();
+  await expect(viewer).toHaveCount(0);
+
+  // The sender can preview what it sent, too.
+  await expect(host.locator('[data-testid=transfer][data-direction=out]').first().getByTestId('thumb')).toHaveCount(1);
+});
+
+test('theme can be switched in the profile and is remembered', async ({ page }) => {
+  await page.goto('/');
+  const root = page.locator('html');
+  await expect(root).toHaveAttribute('data-theme', 'soft'); // the default
+  await page.getByTestId('profile-chip').click();
+  await page.getByTestId('theme-pastel').click();
+  await expect(root).toHaveAttribute('data-theme', 'pastel');
+  await expect(page.getByTestId('theme-pastel')).toHaveAttribute('aria-checked', 'true');
+  await page.reload();
+  await expect(root).toHaveAttribute('data-theme', 'pastel');
+  await page.getByTestId('profile-chip').click();
+  await page.getByTestId('theme-mono').click();
+  await expect(root).toHaveAttribute('data-theme', 'mono');
 });

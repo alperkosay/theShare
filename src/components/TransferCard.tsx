@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { formatBytes, formatSpeed } from '../lib/format';
 import type { TransferStatus, TransferView } from '../lib/transfer/manager';
 import { session } from '../hooks/useSession';
 import { Icon } from './Icon';
+import { Thumb, Viewer } from './Preview';
 
 const STATUS: Record<'in' | 'out', Record<TransferStatus, string>> = {
   out: {
@@ -32,6 +34,11 @@ export function TransferCard({ transfer: t }: { transfer: TransferView }) {
   const canCancel = running || (t.direction === 'out' && t.status === 'pending');
   const saveable = t.direction === 'in' && t.sinkKind !== 'disk';
   const percent = t.totalBytes > 0 ? (t.transferredBytes / t.totalBytes) * 100 : 0;
+  const [viewing, setViewing] = useState<File | null>(null);
+
+  // What can be previewed: what we're sending, or what has arrived in the browser (not straight to disk).
+  const fileAt = (i: number): File | null => (t.direction === 'out' ? (t.sources[i] ?? null) : (t.received[i]?.file ?? null));
+  const available = t.files.map((_, i) => fileAt(i)).filter((f): f is File => f !== null);
 
   let detail = `${formatBytes(t.totalBytes)} · ${STATUS[t.direction][t.status]}`;
   if (running) detail += ` · ${Math.floor(percent)}% · ${formatSpeed(t.speed)}`;
@@ -52,6 +59,7 @@ export function TransferCard({ transfer: t }: { transfer: TransferView }) {
             İptal
           </button>
         )}
+        {single && <Thumb file={fileAt(0)} onOpen={() => setViewing(fileAt(0))} />}
         {single && saveable && t.received[0]?.file && (
           <SaveButton onClick={() => manager?.download(t.id, 0)} done={t.received[0].downloaded} />
         )}
@@ -63,12 +71,13 @@ export function TransferCard({ transfer: t }: { transfer: TransferView }) {
         </div>
       )}
 
-      {!single && (askAccept || (saveable && t.received.length > 0)) && (
+      {!single && (askAccept || t.direction === 'out' || (saveable && t.received.length > 0)) && (
         <ul className="files">
           {t.files.map((f, i) => {
             const r = t.received[i];
             return (
               <li key={i}>
+                <Thumb file={fileAt(i)} onOpen={() => setViewing(fileAt(i))} size="sm" />
                 <span className="filename grow">{f.name}</span>
                 <span className="small muted">{formatBytes(f.size)}</span>
                 {saveable && r?.file && <SaveButton onClick={() => manager?.download(t.id, i)} done={r.downloaded} />}
@@ -90,6 +99,18 @@ export function TransferCard({ transfer: t }: { transfer: TransferView }) {
       )}
 
       {t.status === 'failed' && t.error && <p className="small error-text">{t.error}</p>}
+
+      {viewing && (
+        <Viewer
+          files={available}
+          start={viewing}
+          onClose={() => setViewing(null)}
+          action={(_, index) => {
+            const i = t.received.findIndex((r) => r.file === available[index]);
+            return saveable && i >= 0 ? <SaveButton onClick={() => manager?.download(t.id, i)} done={t.received[i]!.downloaded} /> : null;
+          }}
+        />
+      )}
     </article>
   );
 }

@@ -3,11 +3,16 @@ import { CameraError, getQrDetector, openCamera } from '../lib/qr/scan';
 
 interface Props {
   onResult: (text: string) => void;
+  /**
+   * Keep scanning and report every code read, as fast as frames arrive
+   * (QR streams). Otherwise stop at the first code.
+   */
+  continuous?: boolean;
 }
 
 const SCAN_INTERVAL_MS = 200;
 
-export function QrScanner({ onResult }: Props) {
+export function QrScanner({ onResult, continuous = false }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const onResultRef = useRef(onResult);
   onResultRef.current = onResult;
@@ -34,7 +39,11 @@ export function QrScanner({ onResult }: Props) {
           if (stopped) return;
           try {
             if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-              const hit = (await detector.detect(video)).find((c) => c.rawValue);
+              const codes = await detector.detect(video);
+              if (continuous) {
+                for (const c of codes) if (c.rawValue && !stopped) onResultRef.current(c.rawValue);
+              }
+              const hit = !continuous && codes.find((c) => c.rawValue);
               if (hit && !stopped) {
                 stopped = true;
                 navigator.vibrate?.(50);
@@ -45,7 +54,9 @@ export function QrScanner({ onResult }: Props) {
           } catch {
             // A single failed frame is fine; keep scanning.
           }
-          timer = setTimeout(scan, SCAN_INTERVAL_MS);
+          // Streams: next camera frame (each one may hold a new code); otherwise a calmer pace.
+          if (continuous && 'requestVideoFrameCallback' in video) video.requestVideoFrameCallback(() => void scan());
+          else timer = setTimeout(scan, continuous ? 0 : SCAN_INTERVAL_MS);
         };
         void scan();
       } catch (e) {
@@ -60,7 +71,7 @@ export function QrScanner({ onResult }: Props) {
       clearTimeout(timer);
       stream?.getTracks().forEach((t) => t.stop());
     };
-  }, []);
+  }, [continuous]);
 
   return (
     <>

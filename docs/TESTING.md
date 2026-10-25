@@ -93,3 +93,19 @@ Asıl risk mDNS çözümlemesi; diğer testlere geçmeden önce bunu doğrulayı
 | 3.2 | iOS: Paylaş → Ana Ekrana Ekle → aç → QR tara | Kamera çalışır |
 | 3.3 | Uygulamayı bir kez açtıktan sonra uçak modunda tekrar açın | Uygulama açılır, QR okuyucu çalışır |
 | 3.4 | Yeni sürüm deploy edin, uygulamayı açın | "Yeni sürüm hazır" bildirimi çıkar; aktarım sırasında "Yenile" düğmesi devre dışıdır |
+
+## 4. Profil, geçmiş, yeniden gönderme, önizleme
+
+| # | Senaryo | Beklenen |
+|---|---|---|
+| 4.1 | Profil çipinden ad değiştirin, diğer cihazda yakındaki cihazlar listesine bakın | Yeni adla görünür; sayfayı yenileyince ad korunur |
+| 4.1b | Profil → Görünüm → Pastel ve Soft; açık ve koyu modda tüm sekmeleri gezin | Tema hemen değişir, yenileyince korunur; yazılar her kartta okunaklı |
+| 4.2 | Masaüstü Chrome/Edge: "Dosya gönder"e dokunup seçin, gönderin, sayfayı yenileyin, yeniden bağlanıp Geçmiş → "Yeniden gönder" | Okuma izni bir kez sorulur, dosya gider; ayarlarda saklanan alan 0 B kalır |
+| 4.3 | 4.2'deki dosyayı diskte taşıyın ya da silin, yeniden gönderin | "… bulunamadı" mesajı ve "Dosya seç" bağlantısı |
+| 4.4 | Android Chrome ve iOS Safari: fotoğraf gönderin, uygulamayı kapatıp açın, yeniden gönderin | Dosya seçmeden gider; ayarlarda kullanılan alan artmıştır |
+| 4.5 | 600 MB'lık bir dosya gönderin (Android/iOS) | Kopya saklanmaz; "Yeniden gönder" seçiciyi açar ve dosya adını söyler |
+| 4.6 | Bağlı değilken Geçmiş → "Bağlanınca gönder", sonra bir cihaza bağlanın | Dosyalar sekmesinde "Bağlanınca gönderilecek (1)" görünür, bağlanınca kendiliğinden gönderilir |
+| 4.7 | Gelen bir fotoğrafın küçük resmine dokunun; iPhone'dan HEIC fotoğraf gönderin | JPEG/PNG tam ekran açılır, kaydırınca diğerine geçer; HEIC'te küçük resim çıkmaz (beklenen) |
+| 4.8 | Gelen bir videonun küçük resmine dokunun (MP4 ve iPhone'dan MOV) | Oynatılır; tarayıcı desteklemiyorsa "gösteremiyor" mesajı |
+| 4.9 | Ayarlar → "Her şeyi sıfırla" | Ad, geçmiş ve saklanan dosyalar gider; yeni rastgele ad verilir |
+| 4.10 | Firefox ve Safari gizli pencere | Uygulama açılır; ayarlarda "kalıcı depolama kullanılamıyor" notu görünür |

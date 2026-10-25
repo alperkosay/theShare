@@ -1,5 +1,5 @@
 import { STUN_SERVERS } from '../webrtc/peer';
-import { parseDeviceType, type DeviceInfo } from '../device';
+import { cleanPeerName, parseDeviceType, type DeviceInfo } from '../device';
 import { deriveRoom, randomId, seal, TrackerPool, unseal, type TrackerMessage } from './tracker';
 
 /**
@@ -50,7 +50,7 @@ function parseMessage(text: string | null): Message | null {
   if (!text) return null;
   try {
     const m = JSON.parse(text) as Record<string, unknown>;
-    const name = typeof m.name === 'string' ? m.name.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 40) : '';
+    const name = cleanPeerName(m.name);
     const device = { name, ...parseDeviceType(m.kind, m.os) };
     const rid = typeof m.rid === 'string' && m.rid.length <= 40 ? m.rid : null;
     switch (m.t) {
@@ -145,9 +145,15 @@ export class NearbyNetwork {
   private stopped = false;
 
   constructor(
-    private readonly self: DeviceInfo,
+    private self: DeviceInfo,
     private readonly handlers: NearbyHandlers,
   ) {}
+
+  /** The user renamed this device: announce the new name right away. */
+  setSelf(self: DeviceInfo): void {
+    this.self = self;
+    this.pool?.each((s) => void this.announce(s));
+  }
 
   async start(): Promise<void> {
     const networkId = await detectNetworkId();

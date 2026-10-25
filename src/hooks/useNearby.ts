@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react';
 import { NearbyNetwork, type IncomingRequest, type NearbyDevice } from '../lib/signaling/nearby';
 import { selfDevice, type DeviceInfo } from '../lib/device';
 import { session } from './useSession';
+import { profile } from './useProfile';
 
 export interface NearbySnapshot {
   status: 'off' | 'searching' | 'active' | 'unavailable';
@@ -23,6 +24,16 @@ class Nearby {
   };
   private listeners = new Set<() => void>();
   private net: NearbyNetwork | null = null;
+
+  constructor() {
+    // A renamed device shows its new name on the radar and to nearby devices right away.
+    profile.subscribe(() => {
+      const self = selfDevice();
+      if (self.name === this.state.self.name) return;
+      this.set({ self });
+      this.net?.setSelf(self);
+    });
+  }
 
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);

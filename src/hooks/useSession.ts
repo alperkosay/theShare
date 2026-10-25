@@ -3,8 +3,7 @@ import { PeerLink, type LinkState } from '../lib/webrtc/peer';
 import { SignalError } from '../lib/webrtc/signal-codec';
 import { pairingCode } from '../lib/webrtc/pairing-code';
 import { CODE_TTL_MS, generateCode, hostWithCode, joinWithCode, normalizeCode } from '../lib/signaling/code-rendezvous';
-import { TransferManager, type TextMessage, type TransferView } from '../lib/transfer/manager';
-import type { DeviceInfo } from '../lib/device';
+import { TransferManager, type PeerInfo, type TextMessage, type TransferRecord, type TransferView } from '../lib/transfer/manager';
 
 export type Role = 'host' | 'join';
 /**
@@ -23,8 +22,8 @@ export interface SessionSnapshot {
   pairCode: string | null;
   /** The other device's display name: from the nearby list, or its hello once connected. */
   peerName: string | null;
-  /** The other device's type/OS, known once connected (from its hello). */
-  peer: DeviceInfo | null;
+  /** The other device's type/OS and persistent id, known once connected (from its hello). */
+  peer: PeerInfo | null;
   /** QR mode: our offer (host) or answer (joiner) payload to show as QR/text. */
   localCode: string | null;
   wasConnected: boolean;
@@ -49,10 +48,18 @@ const initial: SessionSnapshot = {
   messages: [],
 };
 
+/** Who a finished transfer was with, for the history. */
+export interface RecordContext {
+  peer: PeerInfo | null;
+  peerName: string | null;
+  method: Method;
+}
+
 /**
  * Owns the PeerLink + TransferManager outside React; components subscribe
- * through useSyncExternalStore. Holds no persistent state: everything lives
- * in memory and is dropped on reset().
+ * through useSyncExternalStore. Holds no persistent state itself: everything
+ * lives in memory and is dropped on reset(). Finished transfers are handed to
+ * onRecord, which the history (hooks/useHistory) fills in.
  */
 class Session {
   private state: SessionSnapshot = initial;
@@ -62,6 +69,7 @@ class Session {
   private expiryTimer: ReturnType<typeof setTimeout> | undefined;
   link: PeerLink | null = null;
   manager: TransferManager | null = null;
+  onRecord: (record: TransferRecord, context: RecordContext) => void = () => {};
 
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -265,6 +273,10 @@ class Session {
         manager.onChange = (transfers) => this.set({ transfers });
         manager.onText = (message) => this.set({ messages: [...this.state.messages, message] });
         manager.onPeerInfo = (peer) => this.set({ peerName: peer.name, peer });
+        manager.onRecord = (record) => {
+          const { peer, peerName, method } = this.state;
+          this.onRecord(record, { peer, peerName, method });
+        };
         manager.onPeerLeft = () => {
           this.peerLeft = true;
         };

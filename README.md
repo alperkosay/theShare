@@ -1,6 +1,6 @@
 # theShare
 
-Cihazdan cihaza dosya paylaşımı. Aynı Wi-Fi'daki cihazlar listede kendiliğinden görünür; değilse 6 haneli kodla bağlanırsınız. Dosyalar WebRTC ile **doğrudan** karşı cihaza gider. Kendi sunucusu, veritabanı, hesabı ve telemetrisi yoktur. Sadece statik dosyalardan oluşur, **her yerde yayınlanabilir**.
+Cihazdan cihaza dosya paylaşımı. Aynı Wi-Fi'daki cihazlar listede kendiliğinden görünür; değilse 6 haneli kodla bağlanırsınız. Dosyalar WebRTC ile **doğrudan** karşı cihaza gider. Kendi sunucusu, sunucu tarafında veritabanı, hesabı ve telemetrisi yoktur. Sadece statik dosyalardan oluşur, **her yerde yayınlanabilir**.
 
 > **Durum: MVP.** Chromium ↔ Chromium akışları otomatik testlerle doğrulandı. Gerçek telefonlar, iOS Safari ve Firefox henüz doğrulanmadı; ayrıntılar için [Test durumu](#test-durumu).
 
@@ -39,13 +39,13 @@ Ana ekranda, aynı ağda theShare'i açmış cihazlar listelenir. Birine dokunun
 Tarayıcılar yerel ağı tarayamaz. Bunun yerine şu yöntem kullanılır ([nearby.ts](src/lib/signaling/nearby.ts)):
 
 1. **Genel IP'yi öğrenme:** Aynı Wi-Fi'daki cihazlar aynı genel IP adresini paylaşır. Her cihaz bu adresi bir STUN sunucusundan öğrenir (`stun.l.google.com`, `stun.cloudflare.com`).
-2. **Odaya katılma:** Adresten bir oda türetilir. Cihazlar bu odaya aşağıdaki tracker'lar üzerinden katılır ve birkaç saniyede bir şifreli bir "buradayım" mesajı (rastgele cihaz adı + cihaz türü) yayınlar.
+2. **Odaya katılma:** Adresten bir oda türetilir. Cihazlar bu odaya aşağıdaki tracker'lar üzerinden katılır ve birkaç saniyede bir şifreli bir "buradayım" mesajı (cihaz adı + cihaz türü) yayınlar. Kalıcı cihaz kimliği bu mesajda **yer almaz**.
 
 Keşif yalnızca ana ekran açıkken çalışır; bağlantı kurulunca durur.
 
 **Bilinen sınırlar:**
 
-- **Aynı IP, aynı ağ demek değildir.** Mobil veride (operatör NAT'ı), büyük ofis veya okul ağlarında tanımadığınız kişiler de aynı genel IP'yi paylaşabilir. Bu kişiler rastgele cihaz adınızı görebilir, ama **onayınız olmadan bağlanamaz**.
+- **Aynı IP, aynı ağ demek değildir.** Mobil veride (operatör NAT'ı), büyük ofis veya okul ağlarında tanımadığınız kişiler de aynı genel IP'yi paylaşabilir. Bu kişiler cihaz adınızı görebilir, ama **onayınız olmadan bağlanamaz**.
 - **Genel IP'nizi bilen biri** odayı hesaplayıp aynı şekilde listede görünebilir; yine onay gerekir.
 - **IPv6:** Yalnızca IPv6 kullanan ağlarda cihazlar /64 önekine göre gruplanır.
 - **STUN ve tracker'lar genel IP'nizi görür;** bu, herhangi bir web sitesini açtığınızda olanla aynıdır.
@@ -89,12 +89,26 @@ Kod oluşturan ekranda kodu içeren bir QR da gösterilir. Telefonun kamera uygu
 
 Bağlantı bilgisi QR'a sığsın diye SDP küçültülür (~110–200 karakter), bkz. [signal-codec.ts](src/lib/webrtc/signal-codec.ts).
 
+### Sıfır bağlantı (hiçbir ağ olmadan)
+
+Ana ekrandaki **Sıfır bağlantı** kartı, iki cihaz arasında **hiçbir bağlantı kurmaz**: Wi-Fi, internet, WebRTC, Bluetooth yok. Gönderen ekranda hızla değişen QR kodlar gösterir, alan cihaz kamerasıyla okur. Uçak modundaki iki cihaz arasında da çalışır. Bu modda yakındaki cihaz keşfi de kapanır.
+
+- **Ne için:** Küçük dosyalar, notlar, şifreler, anahtarlar. En fazla 1 MB (sıkıştırılmış). Hız saniyede birkaç KB'dır: **Kararlı** ~1 KB/sn, **Normal** ~3 KB/sn, **Hızlı** ~7 KB/sn (kamera ve ekrana göre değişir). 100 KB'lık bir dosya Normal hızda yaklaşık 40 saniye sürer.
+- **Kaçan kareler sorun değil:** Veri, fountain code ile kodlanır ([fountain.ts](src/lib/qr/fountain.ts)). Önce dosyanın parçaları sırayla gösterilir, ardından parçaların rastgele XOR karışımları sonsuza kadar akar. Alıcı **herhangi** K farklı kareyi okuyunca (K = parça sayısı) dosyayı çözer; hangi kareleri kaçırdığı ya da akışa ne zaman başladığı önemli değildir. Kareler kaybolsa bile gereken kare sayısı teorik sınıra yakındır: %10 kayıpta ~1,11·K, %25 kayıpta ~1,33·K. Çözme, GF(2) üzerinde artımlı Gauss eliminasyonuyla yapılır.
+- **Verimli QR:** Veri, QR'ın alfanümerik moduna uyan base45 (RFC 9285) ile yazılır; base64'e göre kare başına ~%30 daha fazla veri sığar. Metin ve sıkıştırılabilen dosyalar `deflate-raw` ile sıkıştırılır.
+- **Bütünlük:** Gönderen, orijinal verinin SHA-256'sını da yollar; alıcı birleştirdikten sonra karşılaştırır. Dosya adı, diğer yöntemlerdeki gibi temizlenir; metin HTML olarak işlenmez.
+- **Gizlilik:** Kodları gören herkes (ör. ekranı çeken bir kamera) veriyi okuyabilir. Şifreleme yoktur; gizli bir şey gönderirken ekranı yalnızca alıcı cihaza gösterin.
+- **Tek yönlü:** Alıcının gönderene "aldım" demesi için bir kanal yoktur. Alıcıda "Alındı" çıkınca gönderende **Bitti**'ye basın.
+
 ## Özellikler
 
-- **Arayüz:** Mobil uygulama gibi altta bir dock ile üç sekme: **Cihazlar** (radar, bağlantı), **Dosyalar**, **Pano**. Koyu ve açık tema sistem ayarını izler. Animasyonlar "hareketi azalt" ayarına uyar ve dosya aktarımı sürerken süs animasyonları durur. Yazı tipi (Space Grotesk, OFL) uygulamayla birlikte gelir.
+- **Arayüz:** Mobil uygulama gibi altta bir dock ile dört sekme: **Cihazlar** (radar, bağlantı), **Dosyalar**, **Pano**, **Geçmiş**. Uygulama simgesi piksel tarzında bir "gönder" okudur; arkasından akan pikseller veriyi anlatır (başlıktaki logoda bu pikseller hafifçe akar). Üç tema, profil → **Görünüm**'den seçilir ve cihazda saklanır: **Sade** (Apple tarzı tek renkli: açık temada beyaz kartlar ve siyah düğmeler, koyu temada tersi, vurgu olarak yalnızca küçük pastel dokunuşlar) ve **Pastel** (yumuşak, oyuncu: pastel dolgulu kartlar, hafif renkli gölgeler, daha yuvarlak köşeler ve Apple cihazlarda yuvarlak sistem yazı tipi) ve **Soft** (varsayılan; Soft UI / neumorphism: yüzeyler arka planla aynı renkte, yalnızca açık ve koyu gölgelerle kabarık ya da içe basık görünür; tek mavi vurgu). Hepsinde düğmeler ve kontroller hap (pill) biçimlidir; koyu/açık mod sistem ayarını izler. Yazı tipi cihazın sistem yazı tipidir (Apple cihazlarda SF Pro). Animasyonlar "hareketi azalt" ayarına uyar ve dosya aktarımı sürerken süs animasyonları durur.
 - Bir veya çok dosya gönderme, **alıcı onayı zorunlu**
 - **Metin ve pano:** Not, bağlantı veya kod gönderme; "Panodakini gönder" ile tek dokunuşta pano içeriği. Gelen metin sohbet balonu olarak görünür ve "Kopyala" ile alınır. Yalnızca `http(s)` bağlantılarına "Aç" düğmesi çıkar; metin her zaman düz metin olarak gösterilir, HTML olarak işlenmez. Metin için onay istenmez, en fazla 100.000 karakter.
-- **Cihaz adı ve türü:** Her cihaz rastgele bir ad ("Mavi Kaplan") ve türüyle görünür: iPhone, iPad, Android telefon/tablet, Windows/Linux bilgisayar, Mac. Bu bilgi tarayıcının kendi bildirdiği bilgiden tahmin edilir; gerçek cihaz adı paylaşılmaz.
+- **Kullanıcı adı ve cihaz türü:** Her cihaza rastgele bir ad ("Mavi Kaplan") verilir ve saklanır. Ad, Cihazlar sekmesinin sağ üstündeki profil çipinden değiştirilir; 2–24 karakter, emoji olabilir. Ad her zaman cihaz türüyle birlikte gösterilir: iPhone, iPad, Android telefon/tablet, Windows/Linux bilgisayar, Mac. Tür, tarayıcının kendi bildirdiği bilgiden tahmin edilir; gerçek cihaz adı paylaşılmaz.
+- **Geçmiş:** Bu cihazdan neyin, ne zaman, hangi cihaza gönderildiği ve kimden ne alındığı. Güne göre gruplanır (Bugün, Dün, tarih); Tümü/Gönderilen/Alınan filtresi ve ada ya da cihaza göre arama vardır. Metinler varsayılan olarak geçmişe **girmez**; ayarlardan açılırsa ilk 200 karakter saklanır. Kayıtlar varsayılan olarak 90 gün sonra silinir (30 gün, 1 yıl ya da süresiz seçilebilir).
+- **Yeniden gönderme:** Geçmişteki bir gönderimi, yeni bir bağlantıda dosyayı tekrar seçmeden gönderme. Masaüstü Chrome/Edge'de dosyanın kendisi değil **dosya tutamacı** saklanır (yer kaplamaz; yeniden gönderirken okuma izni bir kez daha sorulur, dosya taşındıysa "bulunamadı" denir). Diğer tarayıcılarda gönderilen dosyanın **kopyası** saklanır: toplam en fazla 2 GB, dosya başına 500 MB; sınır aşılınca en eski kopyalar silinir. Kopya yoksa "Yeniden gönder" dosya seçiciyi açar ve hangi dosyanın seçileceğini söyler. Bağlı değilken basılırsa dosya **Bekleyenler**'e eklenir ve bir cihaza bağlanınca kendiliğinden gönderilir (alıcı yine onaylar).
+- **Önizleme:** Resim (PNG, JPEG, GIF, WebP, AVIF, BMP) ve video (MP4, WebM, MOV) dosyalarında küçük resim çıkar; dokununca tam ekran açılır, oklarla ya da kaydırarak diğerlerine geçilir. Gelen ve gönderilen dosyalarda, geçmişte de saklanan kopyalarda çalışır. Tür dosyanın adından ya da gönderenin beyanından değil, **ilk baytlarından** anlaşılır; SVG ve HTML hiçbir zaman önizlenmez.
 - **Bağlantı paylaşma:** Kod ekranındaki "Bağlantıyı paylaş" ile kod, link olarak WhatsApp vb. üzerinden gönderilebilir. Linke tıklayan kişi otomatik bağlanır.
 - **ZIP olarak gönderme:** Birden çok dosya tek bir `.zip` olarak gidebilir. Sıkıştırma yapılmaz, ZIP gönderen cihazda belleğe kopyalanmadan oluşturulur ([zip.ts](src/lib/transfer/zip.ts)). Toplam en fazla ~4 GB; daha büyükse dosyalar ayrı gider.
 - Dosyaları pencereye **sürükle-bırak**
@@ -121,7 +135,8 @@ Bağlantı bilgisi QR'a sığsın diye SDP küçültülür (~110–200 karakter)
   - Her aktarım için **alıcı onayı**.
 - **Tracker'lar ne görür?** Şifreli bağlantı bilgisini ve WebSocket bağlantısından gelen IP adresinizi görür. Şifreleme, bağlantı bilgisindeki yerel adreslerin sıradan bir gözlemci tarafından okunmasını engeller. Ancak kodu deneme yanılmayla bulan biri şifreyi çözebilir. Hiçbir dış hizmet istemiyorsanız QR yöntemini kullanın.
 - **Dosya içeriği ve adları:** Gönderenin beyan ettiği dosya türüne güvenilmez; indirmeler `application/octet-stream` olarak verilir. Dosya adları temizlenir (yol ayraçları, kontrol karakterleri, Windows'a ayrılmış adlar).
-- **Veri saklanmaz:** Geçmiş, veritabanı ve `localStorage` kullanımı yoktur. Oturum bitince geçici dosyalar silinir.
+- **Bu cihazda saklanan veriler:** Kullanıcı adı, kalıcı cihaz kimliği, ayarlar, geçmiş ve yeniden gönderme için dosya tutamaçları/kopyaları tarayıcının IndexedDB'sinde, **yalnızca bu cihazda** tutulur. Hiçbir sunucuya gönderilmez; karşı cihaza yalnızca ad, cihaz türü ve kalıcı cihaz kimliği gider (bağlantı kurulduktan sonra). Geçmiş ve dosya saklama ayarlardan kapatılabilir; "Geçmişi temizle", "Saklanan dosyaları sil" ve "Her şeyi sıfırla" tek dokunuşla siler. Tarayıcının veriyi kendiliğinden silmemesi için `navigator.storage.persist()` istenir. Gelen dosyaların geçici kopyaları oturum bitince yine silinir.
+- **Ad bir kimlik doğrulaması değildir.** Herkes kendine "Annem" adını verebilir; kalıcı cihaz kimliği de karşı tarafın beyanıdır. Asıl güvence güvenlik kodu ve alıcı onayıdır. Gelen adlardan kontrol ve yön değiştirme (bidi) karakterleri temizlenir.
 - **Dış kaynaklar:** Analiz/izleme, harici font ve CDN yoktur. CSP yalnızca kendi adresimize ve yukarıdaki tracker'lara bağlantıya izin verir.
 
 ## Ağ kısıtları
@@ -149,7 +164,7 @@ Bu bölüm dokümantasyona dayanır, **gerçek cihazlarda doğrulanmadı**.
 ```
 src/
   App.tsx                         ekran seçimi + URL'deki davet (#k=kod, #s=QR-teklifi)
-  screens/                        Home, CodeHost, CodeJoin, Host/Join (QR), Session
+  screens/                        sekmeler (Cihazlar, Dosyalar, Pano, Geçmiş) ve eşleştirme akışları
   components/                     QrCode, QrScanner, CodeEntry, TransferCard, Diagnostics…
   hooks/useSession.ts             bağlantı + aktarım yaşam döngüsü
   lib/signaling/tracker.ts        tracker bağlantıları, oda türetme, şifreleme
@@ -158,21 +173,31 @@ src/
   lib/webrtc/peer.ts              RTCPeerConnection, ICE, zaman aşımları
   lib/webrtc/signal-codec.ts      SDP küçültme + doğrulama
   lib/transfer/                   protokol, gönderme/alma, ZIP, disk/OPFS/bellek
-  lib/qr/                         QR üretme/tarama
+  lib/qr/                         QR üretme/tarama; sıfır bağlantı: base45, fountain code, paketleme (airgap.ts)
+  lib/storage/                    IndexedDB, profil, geçmiş, yeniden gönderme
+  lib/preview.ts                  önizleme için içerikten tür tespiti
+  lib/logo.ts                     piksel logo (uygulama içi logo + scripts/gen-icons.mjs)
+  hooks/useProfile.ts, useHistory.ts  profil; geçmiş + bekleyenler
 ```
 
-**Çalışma zamanı bağımlılıkları:** `react`, `react-dom`, `uqr`, `barcode-detector` + `zxing-wasm`, `workbox-window`, `@fontsource-variable/space-grotesk`.
+**Çalışma zamanı bağımlılıkları:** `react`, `react-dom`, `uqr`, `barcode-detector` + `zxing-wasm`, `workbox-window`.
 
 ## Test durumu
 
 | Senaryo | Durum |
 |---|---|
-| Signaling codec, protokol doğrulama, dosya adı temizleme, kod/şifreleme, ZIP biçimi, cihaz/işletim sistemi tespiti, metin mesajı doğrulama | ✅ Birim testi (46) |
+| Signaling codec, protokol doğrulama, dosya adı temizleme, kod/şifreleme, ZIP biçimi, cihaz/işletim sistemi tespiti, metin mesajı doğrulama, IndexedDB sarmalayıcısı (`fake-indexeddb`), ad doğrulama, geçmiş gruplama/filtreleme, kota hesabı, önizleme türü tespiti | ✅ Birim testi (80) |
+| Ad belirleme → karşı cihazda o adla görünme; geçmişte dosya adı, saat ve cihaz türü; yenilemeden sonra kaydın kalması; bağlı değilken yeniden gönder → bekleyenler → yeni bağlantıda otomatik gönderim (SHA-256); "Her şeyi sıfırla" sonrası boş depolama | ✅ E2E |
+| Gelen resimde küçük resim ve tam ekran önizleme (yanıltıcı ad/türle bile içerikten tespit) | ✅ E2E |
+| Dosya tutamacıyla yeniden gönderme (masaüstü Chrome/Edge seçicisi) | ⏳ Elle test edilmeli: Playwright yerel seçiciyi açamaz |
 | Metin mesajları (HTML olarak işlenmemesi, link "Aç" düğmesi); karşı cihaz adı ve türünün görünmesi | ✅ E2E |
 | 6 haneli kodla eşleştirme + aktarım (gerçek tracker'lar üzerinden) | ✅ E2E |
 | Kod QR'ıyla otomatik katılma; yanlış kodda anlaşılır hata | ✅ E2E |
 | Yakındaki cihazlar: listede görünme → istek → onay → aktarım (aynı makinede iki tarayıcı) | ✅ E2E |
 | QR (metin) ile eşleştirme | ✅ E2E |
+| Sıfır bağlantı: base45, fountain code (kayıplı/sırasız/geç başlayan alıcı), paketleme ve bozuk veri reddi | ✅ Birim testi |
+| Sıfır bağlantı: gerçek QR çizimi → sahte kamera → zxing-wasm ile okuma → dosya (SHA-256) ve metin; hiç WebSocket/WebRTC açılmadığı | ✅ E2E |
+| Sıfır bağlantı: gerçek kamerayla ekrandan okuma hızı | ⏳ Gerçek cihazda test edilmedi |
 | Çoklu dosya, 0 bayt, 48 MB; SHA-256 ile içerik kontrolü; ters yön | ✅ E2E |
 | ZIP ile gönderim; işletim sisteminin `tar`/`unzip` aracıyla açılıp doğrulanması | ✅ E2E |
 | Reddetme, iptal, bağlantı kopması, bozuk kod | ✅ E2E |

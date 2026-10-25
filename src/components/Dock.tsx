@@ -1,11 +1,12 @@
 import { Icon, type IconName } from './Icon';
 
-export type Tab = 'devices' | 'files' | 'clipboard';
+export type Tab = 'devices' | 'files' | 'clipboard' | 'history';
 
 const TABS: Array<{ id: Tab; label: string; icon: IconName }> = [
   { id: 'devices', label: 'Cihazlar', icon: 'radar' },
   { id: 'files', label: 'Dosyalar', icon: 'files' },
   { id: 'clipboard', label: 'Pano', icon: 'clipboard' },
+  { id: 'history', label: 'Geçmiş', icon: 'history' },
 ];
 
 interface Props {

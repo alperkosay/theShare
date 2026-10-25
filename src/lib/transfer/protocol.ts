@@ -18,7 +18,7 @@
  *   cancel {id} may be sent by either side at any time.
  */
 
-import { parseDeviceType, type DeviceKind, type DeviceOs } from '../device';
+import { cleanPeerName, parseDeviceType, type DeviceKind, type DeviceOs } from '../device';
 
 export const PROTOCOL_VERSION = 1;
 export const MAX_FILES_PER_TRANSFER = 500;
@@ -36,8 +36,8 @@ export interface FileMeta {
 export const MAX_TEXT_LENGTH = 100_000;
 
 export type ControlMessage =
-  /** Sent once on connect; name/kind are the random display identity (see lib/device). */
-  | { t: 'hello'; v: number; name?: string; kind?: DeviceKind; os?: DeviceOs }
+  /** Sent once on connect: display identity plus a persistent random device id (see lib/device). */
+  | { t: 'hello'; v: number; name?: string; kind?: DeviceKind; os?: DeviceOs; id?: string }
   | { t: 'text'; id: string; text: string }
   | { t: 'offer'; id: string; files: FileMeta[] }
   | { t: 'accept'; id: string }
@@ -78,8 +78,13 @@ export function parseControl(text: string): ControlMessage | null {
   switch (m.t) {
     case 'hello': {
       if (!isCount(m.v)) return null;
-      const name = typeof m.name === 'string' ? m.name.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 40) : '';
-      return { t: 'hello', v: m.v, ...(name ? { name, ...parseDeviceType(m.kind, m.os) } : {}) };
+      const name = cleanPeerName(m.name);
+      return {
+        t: 'hello',
+        v: m.v,
+        ...(name ? { name, ...parseDeviceType(m.kind, m.os) } : {}),
+        ...(isId(m.id) ? { id: m.id } : {}),
+      };
     }
     case 'text':
       return isId(m.id) && typeof m.text === 'string' && m.text.length > 0 && m.text.length <= MAX_TEXT_LENGTH

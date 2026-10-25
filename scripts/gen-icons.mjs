@@ -1,30 +1,25 @@
-// Generates the PWA PNG icons without image tooling dependencies.
+// Generates the PWA PNG icons and favicon.svg without image tooling dependencies.
+// The pixel art comes from src/lib/logo.ts (Node strips its types on import).
 // Usage: node scripts/gen-icons.mjs   (outputs into public/)
 import { deflateSync } from 'node:zlib';
 import { writeFileSync } from 'node:fs';
+import { BOARD_ORIGIN, CELL, GRID, LOGO_PIXELS, logoSvg } from '../src/lib/logo.ts';
 
-// Background: diagonal violet → cyan gradient (matches --grad in styles.css).
-const BG_FROM = [139, 92, 246];
-const BG_TO = [34, 211, 238];
+// Background: solid near-black (matches --ink in styles.css).
+const BG = [29, 29, 31];
 const FG = [255, 255, 255];
 const SAMPLES = 4; // supersampling per axis for anti-aliasing
 
-// Shapes in normalized 0..1 coordinates, kept inside the maskable safe zone (central 80%).
-const inTriangle = (x, y) => {
-  const [ax, ay, bx, by, cx, cy] = [0.5, 0.2, 0.29, 0.43, 0.71, 0.43];
-  const s = (px, py, qx, qy, rx, ry) => (px - rx) * (qy - ry) - (qx - rx) * (py - ry);
-  const d1 = s(x, y, ax, ay, bx, by);
-  const d2 = s(x, y, bx, by, cx, cy);
-  const d3 = s(x, y, cx, cy, ax, ay);
-  return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0));
-};
-const inRect = (x, y, x0, y0, x1, y1) => x >= x0 && x <= x1 && y >= y0 && y <= y1;
-const isForeground = (x, y) =>
-  inTriangle(x, y) ||
-  inRect(x, y, 0.44, 0.4, 0.56, 0.63) || // arrow stem
-  inRect(x, y, 0.25, 0.73, 0.75, 0.79) || // tray bottom
-  inRect(x, y, 0.25, 0.58, 0.31, 0.79) || // tray left
-  inRect(x, y, 0.69, 0.58, 0.75, 0.79); // tray right
+const alphaAt = new Map(LOGO_PIXELS.map((p) => [`${p.col}:${p.row}`, p.alpha]));
+
+/** Foreground opacity at a point in normalized 0..1 coordinates. */
+function coverage(x, y) {
+  const gx = (x * 100 - BOARD_ORIGIN) / CELL;
+  const gy = (y * 100 - BOARD_ORIGIN) / CELL;
+  if (gx < 0 || gy < 0 || gx >= GRID || gy >= GRID) return 0;
+  // Columns are placed on half-cell offsets (see COL_OFFSET in logo.ts).
+  return alphaAt.get(`${Math.floor(gx - 0.5) + 0.5}:${Math.floor(gy)}`) ?? 0;
+}
 
 function crc32(buf) {
   let c;
@@ -51,19 +46,15 @@ function png(size) {
   for (let y = 0; y < size; y++) {
     raw[y * (size * 3 + 1)] = 0; // filter: none
     for (let x = 0; x < size; x++) {
-      let hits = 0;
+      let sum = 0;
       for (let sy = 0; sy < SAMPLES; sy++) {
         for (let sx = 0; sx < SAMPLES; sx++) {
-          if (isForeground((x + (sx + 0.5) / SAMPLES) / size, (y + (sy + 0.5) / SAMPLES) / size)) hits++;
+          sum += coverage((x + (sx + 0.5) / SAMPLES) / size, (y + (sy + 0.5) / SAMPLES) / size);
         }
       }
-      const a = hits / (SAMPLES * SAMPLES);
+      const a = sum / (SAMPLES * SAMPLES);
       const o = y * (size * 3 + 1) + 1 + x * 3;
-      const t = (x + y) / (2 * (size - 1));
-      for (let i = 0; i < 3; i++) {
-        const bg = BG_FROM[i] * (1 - t) + BG_TO[i] * t;
-        raw[o + i] = Math.round(bg * (1 - a) + FG[i] * a);
-      }
+      for (let i = 0; i < 3; i++) raw[o + i] = Math.round(BG[i] * (1 - a) + FG[i] * a);
     }
   }
   const ihdr = Buffer.alloc(13);
@@ -87,3 +78,6 @@ for (const [name, size] of [
   writeFileSync(new URL(`../public/${name}`, import.meta.url), png(size));
   console.log(`public/${name}`);
 }
+
+writeFileSync(new URL('../public/favicon.svg', import.meta.url), logoSvg('#1d1d1f', '#ffffff'));
+console.log('public/favicon.svg');

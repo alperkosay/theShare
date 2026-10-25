@@ -1,5 +1,5 @@
 import type { PeerLink } from '../webrtc/peer';
-import { selfDevice, type DeviceInfo } from '../device';
+import { selfDevice, selfDeviceId, type DeviceInfo } from '../device';
 import {
   MAX_FILES_PER_TRANSFER,
   MAX_TEXT_LENGTH,
@@ -50,7 +50,26 @@ export interface TextMessage {
   at: number;
 }
 
-export type TransferStatus = 'pending' | 'active' | 'finishing' | 'done' | 'rejected' | 'cancelled' | 'failed';
+/** A finished transfer or a text, for the history (lib/storage/history). Emitted once per item. */
+export interface TransferRecord {
+  id: string;
+  direction: 'in' | 'out';
+  kind: 'files' | 'text';
+  at: number;
+  files?: FileMeta[];
+  text?: string;
+  totalBytes: number;
+  status: 'done' | 'failed' | 'cancelled' | 'rejected';
+  /** Outgoing files: what was sent, for keeping a resend copy. */
+  sources?: File[];
+}
+
+/** The other device as described by its hello. */
+export interface PeerInfo extends DeviceInfo {
+  id?: string;
+}
+
+export type TransferStatus ='pending' | 'active' | 'finishing' | 'done' | 'rejected' | 'cancelled' | 'failed';
 
 export interface ReceivedFile {
   name: string;
@@ -74,6 +93,8 @@ export interface TransferView {
   error: string | null;
   sinkKind: SinkKind | null;
   received: ReceivedFile[];
+  /** Outgoing: the files being sent (for previews). Empty for incoming. */
+  sources: File[];
   createdAt: number;
   finishedAt: number | null;
 }
@@ -113,8 +134,9 @@ const isOpen = (s: TransferStatus) => s === 'pending' || s === 'active' || s ===
 export class TransferManager {
   onChange: (transfers: TransferView[]) => void = () => {};
   onPeerLeft: () => void = () => {};
-  onPeerInfo: (peer: DeviceInfo) => void = () => {};
+  onPeerInfo: (peer: PeerInfo) => void = () => {};
   onText: (message: TextMessage) => void = () => {};
+  onRecord: (record: TransferRecord) => void = () => {};
 
   private transfers: Transfer[] = [];
   private dirty = false;
@@ -128,7 +150,8 @@ export class TransferManager {
     link.channel.addEventListener('bufferedamountlow', this.onBufferLow);
     this.ticker = setInterval(() => this.tick(), TICK_MS);
     const self = selfDevice();
-    this.sendControl({ t: 'hello', v: PROTOCOL_VERSION, ...self });
+    const id = selfDeviceId();
+    this.sendControl({ t: 'hello', v: PROTOCOL_VERSION, ...self, ...(id ? { id } : {}) });
   }
 
   get views(): TransferView[] {
@@ -240,6 +263,7 @@ export class TransferManager {
     const message: TextMessage = { id: newTransferId(), direction: 'out', text, at: Date.now() };
     this.sendControl({ t: 'text', id: message.id, text });
     this.onText(message);
+    this.recordText(message);
   }
 
   /** Called when the underlying connection is gone. */
@@ -281,11 +305,16 @@ export class TransferManager {
     switch (msg.t) {
       case 'hello':
         if (msg.v !== PROTOCOL_VERSION) console.warn('[theshare] peer protocol version', msg.v);
-        if (msg.name) this.onPeerInfo({ name: msg.name, kind: msg.kind ?? 'computer', os: msg.os ?? 'other' });
+        if (msg.name) {
+          this.onPeerInfo({ name: msg.name, kind: msg.kind ?? 'computer', os: msg.os ?? 'other', ...(msg.id ? { id: msg.id } : {}) });
+        }
         return;
-      case 'text':
-        this.onText({ id: msg.id, direction: 'in', text: msg.text, at: Date.now() });
+      case 'text': {
+        const message: TextMessage = { id: msg.id, direction: 'in', text: msg.text, at: Date.now() };
+        this.onText(message);
+        this.recordText(message);
         return;
+      }
       case 'bye':
         this.onPeerLeft();
         return;
@@ -544,7 +573,13 @@ export class TransferManager {
     this.markDirty(true);
   }
 
+  private recordText(m: TextMessage): void {
+    const totalBytes = new TextEncoder().encode(m.text).byteLength;
+    this.onRecord({ id: m.id, direction: m.direction, kind: 'text', at: m.at, text: m.text, totalBytes, status: 'done' });
+  }
+
   private finish(t: Transfer, status: TransferStatus, error: string | null): void {
+    const wasOpen = isOpen(t.status);
     t.status = status;
     t.error = error;
     t.speed = 0;
@@ -556,6 +591,18 @@ export class TransferManager {
     }
     this.wake();
     this.markDirty(true);
+    if (wasOpen && !isOpen(status)) {
+      this.onRecord({
+        id: t.id,
+        direction: t.direction,
+        kind: 'files',
+        at: t.finishedAt,
+        files: t.files,
+        totalBytes: t.totalBytes,
+        status: status as TransferRecord['status'],
+        ...(t.direction === 'out' ? { sources: t.sources } : {}),
+      });
+    }
   }
 
   private markDirty(immediate = false): void {
@@ -598,6 +645,7 @@ function baseFields(id: string, files: FileMeta[]): Base {
     error: null,
     sinkKind: null,
     received: [],
+    sources: [],
     createdAt: Date.now(),
     finishedAt: null,
     lastSampleAt: 0,
@@ -618,6 +666,7 @@ function toView(t: Transfer): TransferView {
     error: t.error,
     sinkKind: t.sinkKind,
     received: t.received.map((r) => ({ ...r })),
+    sources: t.sources,
     createdAt: t.createdAt,
     finishedAt: t.finishedAt,
   };

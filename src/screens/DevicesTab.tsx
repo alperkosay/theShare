@@ -3,11 +3,14 @@ import { session, useSession } from '../hooks/useSession';
 import { deviceLabel, selfDevice } from '../lib/device';
 import { Radar } from '../components/Radar';
 import { DeviceIcon, Icon } from '../components/Icon';
+import { ProfileChip } from '../components/Profile';
+import { Logo } from '../components/Logo';
 import { CodeHostScreen } from './CodeHostScreen';
 import { CodeJoinScreen } from './CodeJoinScreen';
 import { HostScreen } from './HostScreen';
 import { JoinScreen } from './JoinScreen';
 import { NearbyConnectScreen } from './NearbyConnectScreen';
+import { AirScreen, type AirMode } from './AirScreen';
 
 export interface UrlInvite {
   /** 6-digit code from …/#k=482913 */
@@ -16,27 +19,36 @@ export interface UrlInvite {
   offer: string | null;
 }
 
+interface Props {
+  invite: UrlInvite;
+  /** Zero-connection (QR stream) screen, if open. Lives in App, which turns network discovery off for it. */
+  air: AirMode | null;
+  onAir: (mode: AirMode | null) => void;
+}
+
 /** "Devices" tab: discovery and pairing flows, or the current connection. */
-export function DevicesTab({ invite }: { invite: UrlInvite }) {
+export function DevicesTab({ invite, air, onAir }: Props) {
   const state = useSession();
   if (state.wasConnected) return <ConnectedView />;
+  if (air && !state.role) return <AirScreen mode={air} onBack={() => onAir(null)} />;
   if (state.method === 'nearby' && state.role) return <NearbyConnectScreen />;
   if (state.role === 'host') return state.method === 'code' ? <CodeHostScreen /> : <HostScreen />;
   if (state.role === 'join') {
     return state.method === 'code' ? <CodeJoinScreen initialCode={invite.code} /> : <JoinScreen initialOffer={invite.offer} />;
   }
-  return <HomeView />;
+  return <HomeView onAir={onAir} />;
 }
 
-function HomeView() {
+function HomeView({ onAir }: { onAir: (mode: AirMode) => void }) {
   return (
     <>
       <header className="brand rise">
-        <img src="./favicon.svg" alt="" width={40} height={40} />
-        <div>
-          <h1 className="gradient-text">theShare</h1>
+        <Logo />
+        <div className="grow">
+          <h1>theShare</h1>
           <p className="small muted">Sunucusuz, cihazdan cihaza paylaşım</p>
         </div>
+        <ProfileChip />
       </header>
 
       <div className="rise" style={{ '--i': 1 } as CSSProperties}>
@@ -72,6 +84,22 @@ function HomeView() {
             </button>
             <button type="button" className="btn" onClick={() => session.reset({ role: 'join', method: 'qr' })} data-testid="qr-join">
               QR tara
+            </button>
+          </div>
+        </section>
+
+        <section className="glass option wide rise" style={{ '--i': 4 } as CSSProperties}>
+          <span className="option-icon">
+            <Icon name="frames" />
+          </span>
+          <h2>Sıfır bağlantı</h2>
+          <p className="small muted">Hiçbir ağ yok: veri ekrandan kameraya akan QR'larla gider. Küçük dosya ve metin için.</p>
+          <div className="actions">
+            <button type="button" className="btn" onClick={() => onAir('send')} data-testid="air-send">
+              Gönder
+            </button>
+            <button type="button" className="btn" onClick={() => onAir('receive')} data-testid="air-receive">
+              Al
             </button>
           </div>
         </section>
