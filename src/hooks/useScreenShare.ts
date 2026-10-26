@@ -1,6 +1,8 @@
 import { useSyncExternalStore } from 'react';
 import { canCaptureScreen, captureScreen, MediaLink, type ScreenQuality, type StreamStats } from '../lib/webrtc/media';
 import { session } from './useSession';
+import { profile } from './useProfile';
+import { ink } from './useInk';
 
 export interface ScreenSnapshot {
   /** This browser can share its screen. Viewing works everywhere. */
@@ -15,9 +17,6 @@ export interface ScreenSnapshot {
   soundOn: boolean;
   /** Changes with every new share from the other side (keys "hide the mini player" etc.). */
   remoteSince: number | null;
-  quality: ScreenQuality;
-  /** Share sound too (tab or system audio, where the browser offers it). */
-  withAudio: boolean;
   /** The other side asked to see our screen. */
   asked: boolean;
   /** We asked to see theirs: 'waiting' for an answer, or why it won't come. */
@@ -40,8 +39,6 @@ class ScreenStore {
     remoteAudio: false,
     soundOn: true,
     remoteSince: null,
-    quality: 'detail',
-    withAudio: false,
     asked: false,
     request: null,
     error: null,
@@ -56,6 +53,10 @@ class ScreenStore {
       this.media = null;
       clearTimeout(this.requestTimer);
       this.set({ local: null, localSince: null, remote: null, remoteAudio: false, remoteSince: null, asked: false, request: null, error: null });
+      ink.reset('local');
+      ink.reset('remote');
+      ink.setActive(false);
+      ink.send = () => {};
       if (!connection) return;
       const { link, manager } = connection;
       const media = new MediaLink(link, {
@@ -73,8 +74,9 @@ class ScreenStore {
           }
         },
       });
-      media.quality = this.state.quality;
-      manager.onMedia = (msg) => media.handle(msg);
+      media.quality = profile.getSnapshot().settings.screenQuality;
+      ink.send = (msg) => manager.sendMedia(msg);
+      manager.onMedia = (msg) => (msg.t === 'ink' || msg.t === 'point' ? ink.receive(msg) : media.handle(msg));
       this.media = media;
     };
   }
@@ -97,6 +99,10 @@ class ScreenStore {
     const { local, remote } = media;
     const remoteStarted = remote !== null && this.state.remote === null;
     if (remoteStarted) clearTimeout(this.requestTimer);
+    // A screen's drawings belong to that one share.
+    if (local !== this.state.local) ink.reset('local');
+    if (remoteStarted || (!remote && this.state.remote)) ink.reset('remote');
+    if (!local && !remote) ink.setActive(false);
     this.set({
       local,
       localSince: local ? (this.state.local ? this.state.localSince : Date.now()) : null,
@@ -114,7 +120,8 @@ class ScreenStore {
     this.set({ error: null, asked: false });
     let stream: MediaStream;
     try {
-      stream = await captureScreen(this.state.quality, this.state.withAudio);
+      const { screenQuality, screenAudio } = profile.getSnapshot().settings;
+      stream = await captureScreen(screenQuality, screenAudio);
     } catch (e) {
       const name = (e as DOMException).name;
       // Dismissed the picker (or the OS refused, which looks the same to the page).
@@ -134,8 +141,9 @@ class ScreenStore {
     this.media?.unshare();
   }
 
+  /** Remembered in the profile; applies live to a running share. */
   setQuality(quality: ScreenQuality): void {
-    this.set({ quality });
+    void profile.updateSettings({ screenQuality: quality });
     void this.media?.setQuality(quality);
   }
 
@@ -144,7 +152,7 @@ class ScreenStore {
   }
 
   setWithAudio(withAudio: boolean): void {
-    this.set({ withAudio });
+    void profile.updateSettings({ screenAudio: withAudio });
   }
 
   /** Asks the other side to share its screen. */

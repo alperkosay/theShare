@@ -1,5 +1,6 @@
 import { randomDeviceName } from '../device';
 import { SAVE_MODES, type SaveMode } from '../transfer/save';
+import { SCREEN_QUALITIES, type ScreenQuality } from '../webrtc/media';
 
 /** "soft": neumorphism (default). "mono": black & white, Apple-like. "pastel": pastel-filled cards. */
 export type Theme = 'mono' | 'pastel' | 'soft';
@@ -22,6 +23,9 @@ export interface Settings {
   retentionDays: number | null;
   /** Where received files are saved (lib/transfer/save). */
   saveMode: SaveMode;
+  /** Screen sharing: the quality preset, and whether to offer sharing sound (lib/webrtc/media). */
+  screenQuality: ScreenQuality;
+  screenAudio: boolean;
 }
 
 export interface Profile {
@@ -41,6 +45,8 @@ export const DEFAULT_SETTINGS: Settings = {
   keepFiles: true,
   retentionDays: 90,
   saveMode: 'auto',
+  screenQuality: 'detail',
+  screenAudio: false,
 };
 
 export const NAME_MIN = 2;
@@ -82,6 +88,8 @@ export function normalizeProfile(stored: Partial<Profile> | undefined): Profile 
   if (!THEMES.includes(settings.theme)) settings.theme = DEFAULT_SETTINGS.theme;
   if (!SCHEMES.includes(settings.scheme)) settings.scheme = DEFAULT_SETTINGS.scheme;
   if (!SAVE_MODES.includes(settings.saveMode)) settings.saveMode = DEFAULT_SETTINGS.saveMode;
+  if (!SCREEN_QUALITIES.includes(settings.screenQuality)) settings.screenQuality = DEFAULT_SETTINGS.screenQuality;
+  if (typeof settings.screenAudio !== 'boolean') settings.screenAudio = DEFAULT_SETTINGS.screenAudio;
   return {
     name: valid ? stored.name! : fresh.name,
     deviceId: typeof stored.deviceId === 'string' && stored.deviceId ? stored.deviceId : fresh.deviceId,

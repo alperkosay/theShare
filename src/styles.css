@@ -668,14 +668,11 @@ textarea {
 /* --- dock --- */
 
 .dock {
-  --items: 4;
   position: fixed;
   z-index: 20;
   left: 50%;
   bottom: max(14px, env(safe-area-inset-bottom));
-  display: grid;
-  grid-template-columns: repeat(var(--items), 1fr);
-  width: min(calc(100% - 32px), 420px);
+  width: min(calc(100% - 32px), 440px);
   padding: 6px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--glass) 80%, transparent);
@@ -694,14 +691,27 @@ textarea {
   }
 }
 
+.dock-items {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--items), 1fr);
+}
+
+/* Sidebar-only parts (desktop). */
+.dock-brand,
+.dock-status {
+  display: none;
+}
+
 .dock-pill {
   position: absolute;
-  top: 6px;
-  bottom: 6px;
-  left: 6px;
-  width: calc((100% - 12px) / var(--items));
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: calc(100% / var(--items));
   border-radius: 999px;
   background: var(--ink);
+  transform: translateX(calc(var(--index) * 100%));
   transition: transform 0.45s var(--spring);
 }
 
@@ -1941,6 +1951,7 @@ select {
 
 .live-dot {
   display: inline-block;
+  flex-shrink: 0;
   width: 8px;
   height: 8px;
   border-radius: 50%;
@@ -1975,37 +1986,6 @@ select {
   backdrop-filter: blur(8px);
 }
 
-.screen-view {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 8px;
-}
-
-/* The stage stays dark in every theme: it frames someone else's screen. */
-.screen-stage {
-  position: relative;
-  display: grid;
-  place-items: center;
-  aspect-ratio: 16 / 10;
-  max-height: 70dvh;
-  border-radius: calc(var(--radius) - 8px);
-  background: #000;
-  overflow: hidden;
-}
-
-.screen-stage video {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-.screen-stage.full {
-  aspect-ratio: auto;
-  max-height: none;
-  border-radius: 0;
-}
-
 .screen-wait {
   position: absolute;
   inset: 0;
@@ -2025,73 +2005,13 @@ select {
   border-top-color: #fff;
 }
 
-.screen-tools {
-  position: absolute;
-  right: 10px;
-  bottom: 10px;
-  display: flex;
-  gap: 6px;
-}
+/* Lobby (nobody shares yet) */
 
-.screen-tool {
-  display: grid;
-  place-items: center;
-  width: 38px;
-  height: 38px;
-  border: none;
-  border-radius: 50%;
-  background: rgb(0 0 0 / 55%);
-  color: #fff;
-  cursor: pointer;
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
-  transition:
-    transform 0.18s var(--spring),
-    background 0.2s;
-}
-
-.screen-tool:hover:not(:disabled) {
-  background: rgb(0 0 0 / 75%);
-}
-
-.screen-tool:active:not(:disabled) {
-  transform: scale(0.9);
-}
-
-.screen-tool.active {
-  background: #fff;
-  color: #000;
-}
-
-.screen-tool:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.screen-tool .icon {
-  width: 18px;
-  height: 18px;
-}
-
-/* Full screen: the toolbar fades out while the pointer is elsewhere, like a video player. */
-@media (hover: hover) {
-  .screen-stage.full .screen-tools,
-  .screen-stage.full .live-pill {
-    opacity: 0;
-    transition: opacity 0.3s;
-  }
-
-  .screen-stage.full:hover .screen-tools,
-  .screen-stage.full:hover .live-pill {
-    opacity: 1;
-  }
-}
-
-.screen-caption {
+.screen-lobby,
+.lobby-col {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 0 8px 4px;
+  gap: inherit;
 }
 
 .screen-peer {
@@ -2106,8 +2026,7 @@ select {
   background: var(--mint);
 }
 
-.screen-options,
-.screen-sharing {
+.screen-options {
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -2122,25 +2041,53 @@ select {
   grid-template-columns: repeat(2, 1fr);
 }
 
-.screen-self {
+.screen-features {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+}
+
+.screen-features ul {
+  display: grid;
   gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.screen-thumb {
+.screen-features li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.feature-icon {
+  display: grid;
+  place-items: center;
   flex-shrink: 0;
-  width: 112px;
-  aspect-ratio: 16 / 10;
+  width: 36px;
+  height: 36px;
   border-radius: 12px;
-  background: #000;
-  overflow: hidden;
+  background: var(--sky);
+  color: var(--on-pastel);
 }
 
-.screen-thumb video {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
+.screen-features li:nth-child(2) .feature-icon {
+  background: var(--rose);
+}
+
+.screen-features li:nth-child(3) .feature-icon {
+  background: var(--mint);
+}
+
+.screen-features li:nth-child(4) .feature-icon {
+  background: var(--peach);
+}
+
+.feature-icon .icon {
+  width: 18px;
+  height: 18px;
 }
 
 .screen-privacy .icon {
@@ -2150,18 +2097,578 @@ select {
   color: var(--ok);
 }
 
-/* Floating mini player on the other tabs. Top right: the bottom has the dock and the chat composer. */
+/* Meeting: stage, control bar, chat. Phones stack them; desktop lays them out (below). */
+
+.meet {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.meet-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 20px;
+}
+
+.meet-title {
+  min-width: 0;
+}
+
+.meet-people {
+  display: none;
+  gap: 6px;
+}
+
+.meet-person {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--glass-strong);
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.meet-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.meet-main {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* Dark in every theme: it frames someone's screen. */
+.meet-stage {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  -webkit-user-select: none;
+  user-select: none;
+  max-height: 70dvh;
+  border-radius: calc(var(--radius) - 4px);
+  background: #0b0b0f;
+  overflow: hidden;
+}
+
+/* A ring on top of everything: red while you present, blue while drawing. */
+.meet-stage::after {
+  content: '';
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 0 transparent;
+  pointer-events: none;
+  transition: box-shadow 0.25s var(--ease);
+}
+
+.meet.presenting .meet-stage::after {
+  box-shadow: inset 0 0 0 3px var(--live);
+}
+
+.meet-stage.drawing::after {
+  box-shadow: inset 0 0 0 3px #0a84ff;
+}
+
+.meet-surface {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.meet-surface video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.meet-surface.tile {
+  z-index: 3;
+  inset: auto auto 10px 10px;
+  width: 28%;
+  aspect-ratio: 16 / 10;
+  border: 2px solid rgb(255 255 255 / 22%);
+  border-radius: 12px;
+  background: #000;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 50%);
+  overflow: hidden;
+  transition: transform 0.25s var(--spring);
+}
+
+.meet-surface.tile:hover {
+  transform: scale(1.04);
+}
+
+.surface-label {
+  position: absolute;
+  z-index: 1;
+  top: 10px;
+  left: 10px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 55%);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 600;
+  pointer-events: none;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+.meet-surface.tile .surface-label {
+  top: auto;
+  bottom: 5px;
+  left: 5px;
+  padding: 1px 7px;
+  font-size: 0.62rem;
+}
+
+.surface-select {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.ink-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.ink-layer.drawing {
+  pointer-events: auto;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.ink-layer.drawing.mode-laser {
+  cursor: none;
+}
+
+.ink-layer.drawing.mode-eraser {
+  cursor: cell;
+}
+
+.meet-banner,
+.meet-notice {
+  position: absolute;
+  z-index: 5;
+  left: 50%;
+  max-width: calc(100% - 24px);
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 62%);
+  color: #fff;
+  font-size: 0.8rem;
+  text-align: center;
+  pointer-events: none;
+  transform: translateX(-50%);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+.meet-banner {
+  bottom: 12px;
+}
+
+.meet-notice {
+  z-index: 6;
+  top: 12px;
+  background: rgb(0 0 0 / 78%);
+  animation: rise 0.35s var(--spring) both;
+}
+
+.meet-peek {
+  position: absolute;
+  z-index: 6;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(70%, 360px);
+  padding: 8px 14px;
+  border: none;
+  border-radius: 16px;
+  background: var(--glass);
+  color: var(--text);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 35%);
+  text-align: left;
+  cursor: pointer;
+  animation: rise 0.4s var(--spring) both;
+}
+
+.snap-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 20px;
+  animation: rise 0.4s var(--spring) both;
+}
+
+.snap-card img {
+  display: block;
+  width: 100%;
+  max-height: 180px;
+  border-radius: 14px;
+  background: #000;
+  object-fit: contain;
+}
+
+.snap-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.snap-actions .btn {
+  flex: 1;
+}
+
+/* Control bar */
+
+.meet-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  align-self: center;
+  justify-content: center;
+  gap: 2px;
+  max-width: 100%;
+  padding: 6px;
+  border-radius: 24px;
+}
+
+.meet-btn {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 2px;
+  min-width: 58px;
+  padding: 7px 8px 5px;
+  border: none;
+  border-radius: 18px;
+  background: none;
+  color: var(--text);
+  font-size: 0.68rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.2s var(--ease),
+    color 0.2s,
+    transform 0.18s var(--spring);
+}
+
+.meet-btn:hover:not(:disabled) {
+  background: var(--glass-strong);
+}
+
+.meet-btn:active:not(:disabled) {
+  transform: scale(0.93);
+}
+
+.meet-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.meet-btn.active,
+.meet-btn.primary,
+.meet-btn.primary:hover:not(:disabled) {
+  background: var(--ink);
+  color: var(--on-ink);
+}
+
+.meet-btn.danger,
+.meet-btn.danger:hover:not(:disabled) {
+  background: var(--live);
+  color: #fff;
+}
+
+.meet-btn-icon {
+  position: relative;
+  display: grid;
+}
+
+.meet-btn-icon .badge {
+  top: -6px;
+  right: -12px;
+}
+
+.meet-btn.small {
+  min-width: 36px;
+  padding: 7px;
+  border-radius: 12px;
+}
+
+.brand-desktop {
+  display: none;
+}
+
+.empty-list {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 28px 20px;
+  text-align: center;
+}
+
+.meet-bar-sep {
+  display: none;
+  flex-shrink: 0;
+  align-self: stretch;
+  width: 1px;
+  margin: 6px 4px;
+  background: var(--glass-border);
+}
+
+/* Drawing tools */
+
+.ink-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  align-self: center;
+  justify-content: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 6px 8px;
+  border-radius: 22px;
+  animation: rise 0.35s var(--spring) both;
+}
+
+.ink-group {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 2px;
+  transition: opacity 0.2s;
+}
+
+.ink-group.dim {
+  opacity: 0.4;
+}
+
+.ink-sep {
+  flex-shrink: 0;
+  width: 1px;
+  height: 24px;
+  background: var(--glass-border);
+}
+
+.ink-btn {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    color 0.2s;
+}
+
+.ink-btn:hover:not(:disabled) {
+  background: var(--glass-strong);
+}
+
+.ink-btn.active {
+  background: var(--ink);
+  color: var(--on-ink);
+}
+
+.ink-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.ink-btn .icon {
+  width: 19px;
+  height: 19px;
+}
+
+.ink-dot {
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.ink-swatch {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  margin: 0 3px;
+  padding: 0;
+  border: 2px solid var(--glass);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--glass-border);
+  cursor: pointer;
+  transition: transform 0.18s var(--spring);
+}
+
+.ink-swatch.active {
+  box-shadow: 0 0 0 2px var(--text);
+  transform: scale(1.15);
+}
+
+.ink-tools.compact .ink-btn {
+  width: 32px;
+  height: 32px;
+}
+
+/* Chat beside the stage */
+
+.meet-chat {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  padding: 12px;
+}
+
+.meet-chat-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px;
+}
+
+.chat-close {
+  padding: 4px;
+  color: var(--muted);
+}
+
+.meet-chat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 40vh;
+  padding: 2px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.meet-chat-list .bubble {
+  max-width: 92%;
+  padding: 8px 12px;
+  font-size: 0.92rem;
+}
+
+.meet-chat .chat-empty {
+  margin: 16px 0;
+  padding: 8px;
+}
+
+.composer.chat-composer {
+  position: static;
+  padding: 8px 10px;
+  border-radius: 20px;
+  box-shadow: none;
+}
+
+/* Pop-out window (Document Picture-in-Picture) */
+
+.popout-body {
+  margin: 0;
+  background: var(--bg);
+}
+
+.popout {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 100vh;
+  padding: 10px;
+}
+
+.popout-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px 6px 14px;
+  border-radius: 18px;
+  font-size: 0.9rem;
+}
+
+.popout-stage {
+  position: relative;
+  flex-shrink: 0;
+  aspect-ratio: 16 / 10;
+  border-radius: 16px;
+  background: #000;
+  overflow: hidden;
+}
+
+.popout .meet-chat {
+  flex: 1;
+}
+
+.popout .meet-chat-list {
+  flex: 1;
+  max-height: none;
+}
+
+/* Floating mini player on the other tabs; drag it to any corner. */
+
 .screen-mini {
   position: fixed;
   z-index: 22;
-  top: max(12px, env(safe-area-inset-top));
-  right: 12px;
   width: min(40vw, 176px);
   aspect-ratio: 16 / 10;
   border-radius: 16px;
   background: #000;
   box-shadow: 0 2px 6px rgb(0 0 0 / 18%), 0 18px 40px -16px rgb(0 0 0 / 45%);
+  touch-action: none;
+  cursor: grab;
   animation: rise 0.45s var(--spring) both;
+}
+
+.screen-mini.dragging {
+  cursor: grabbing;
+  opacity: 0.92;
+  animation: none;
+}
+
+.screen-mini.corner-tl,
+.screen-mini.corner-tr {
+  top: max(12px, env(safe-area-inset-top));
+}
+
+.screen-mini.corner-bl,
+.screen-mini.corner-br {
+  bottom: calc(max(14px, env(safe-area-inset-bottom)) + 84px);
+}
+
+.screen-mini.corner-tl,
+.screen-mini.corner-bl {
+  left: 12px;
+}
+
+.screen-mini.corner-tr,
+.screen-mini.corner-br {
+  right: 12px;
 }
 
 .screen-mini-open {
@@ -2174,13 +2681,14 @@ select {
   border-radius: inherit;
   background: none;
   overflow: hidden;
-  cursor: pointer;
+  cursor: inherit;
 }
 
 .screen-mini-open video {
   width: 100%;
   height: 100%;
   object-fit: contain;
+  pointer-events: none;
 }
 
 .screen-mini .live-pill {
@@ -2234,6 +2742,415 @@ select {
 .small-avatar .icon {
   width: 18px;
   height: 18px;
+}
+
+/* --- connected: quick actions; tab layouts (one column on phones) --- */
+
+.home-grid,
+.home-col,
+.connected-grid,
+.files-layout,
+.files-compose {
+  display: flex;
+  flex-direction: column;
+  gap: inherit;
+}
+
+.quick-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 460px) {
+  .quick-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.quick-action {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 22px;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.25s var(--spring);
+}
+
+.quick-action:hover {
+  transform: translateY(-2px);
+}
+
+.quick-action:active {
+  transform: scale(0.98);
+}
+
+.qa-chevron {
+  color: var(--muted);
+}
+
+.qa-clipboard .option-icon {
+  background: var(--lemon);
+}
+
+.qa-screen .option-icon {
+  background: var(--mint);
+}
+
+.qa-history .option-icon {
+  background: var(--peach);
+}
+
+/* --- desktop: sidebar instead of the dock, wider layouts, centred dialogs --- */
+
+@media (min-width: 1024px) {
+  :root {
+    --sidebar: 252px;
+  }
+
+  .app {
+    padding-left: var(--sidebar);
+  }
+
+  .screen {
+    max-width: 580px;
+    padding: 40px 32px 48px;
+  }
+
+  .screen.wide {
+    max-width: 1140px;
+  }
+
+  .screen.wide.tab-clipboard {
+    max-width: 820px;
+  }
+
+  .screen.wide.tab-history {
+    max-width: 940px;
+  }
+
+  /* The meeting uses the whole window height, like a call app. */
+  .screen.meeting {
+    max-width: none;
+    height: 100dvh;
+    padding: 20px 24px;
+  }
+
+  .dock {
+    top: 16px;
+    bottom: 16px;
+    left: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    width: calc(var(--sidebar) - 32px);
+    padding: 20px 12px 12px;
+    border-radius: 28px;
+    transform: none;
+    animation: dock-side-in 0.6s var(--spring) both;
+  }
+
+  @keyframes dock-side-in {
+    from {
+      opacity: 0;
+      transform: translateX(-24px);
+    }
+  }
+
+  .brand-mobile,
+  .brand .logo {
+    display: none;
+  }
+
+  .brand-desktop {
+    display: inline;
+  }
+
+  .empty-list {
+    padding: 64px 24px;
+  }
+
+  .meet-bar {
+    flex-wrap: nowrap;
+  }
+
+  .meet-bar-sep {
+    display: block;
+  }
+
+  .ink-tools {
+    flex-wrap: nowrap;
+  }
+
+  .dock-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 8px;
+    line-height: 1.25;
+  }
+
+  .dock-brand strong {
+    font-size: 1.2rem;
+    letter-spacing: -0.02em;
+  }
+
+  .dock-items {
+    grid-template-columns: 1fr;
+    grid-auto-rows: 48px;
+  }
+
+  .dock-pill {
+    width: 100%;
+    height: 48px;
+    bottom: auto;
+    border-radius: 16px;
+    transform: translateY(calc(var(--index) * 100%));
+  }
+
+  .dock-item {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 0 14px;
+    border-radius: 16px;
+    font-size: 0.95rem;
+  }
+
+  .dock-item:hover:not(.active) {
+    color: var(--text);
+  }
+
+  .dock-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: auto;
+    padding: 10px;
+    border: none;
+    border-radius: 18px;
+    background: var(--glass-strong);
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .dock-status .grow {
+    min-width: 0;
+  }
+
+  .dock-status .avatar {
+    width: 38px;
+    height: 38px;
+  }
+
+  .home-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+    gap: 24px;
+  }
+
+  .connected-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    align-items: start;
+    gap: 24px;
+  }
+
+  .quick-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .files-layout {
+    display: grid;
+    grid-template-columns: minmax(300px, 400px) minmax(0, 1fr);
+    align-items: start;
+    gap: 24px;
+  }
+
+  .files-compose {
+    position: sticky;
+    top: 24px;
+  }
+
+  .files-compose .dropzone {
+    padding: 56px 24px;
+  }
+
+  .screen-lobby {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+    gap: 24px;
+  }
+
+  .lobby-col {
+    gap: 16px;
+  }
+
+  .composer {
+    bottom: 24px;
+  }
+
+  /* Bottom sheets become centred dialogs. */
+  .sheet-backdrop {
+    align-items: center;
+    padding: 32px;
+  }
+
+  .sheet {
+    max-height: calc(100dvh - 64px);
+    padding-bottom: 24px;
+    animation: dialog-in 0.35s var(--spring) both;
+  }
+
+  .sheet-grip {
+    visibility: hidden;
+  }
+
+  @keyframes dialog-in {
+    from {
+      opacity: 0;
+      transform: translateY(12px) scale(0.95);
+    }
+  }
+
+  .toast {
+    left: calc(50% + var(--sidebar) / 2);
+    bottom: 28px;
+  }
+
+  .screen-mini {
+    width: 300px;
+  }
+
+  .screen-mini.corner-tl,
+  .screen-mini.corner-tr {
+    top: 24px;
+  }
+
+  .screen-mini.corner-bl,
+  .screen-mini.corner-br {
+    bottom: 24px;
+  }
+
+  .screen-mini.corner-tl,
+  .screen-mini.corner-bl {
+    left: calc(var(--sidebar) + 16px);
+  }
+
+  .screen-mini.corner-tr,
+  .screen-mini.corner-br {
+    right: 24px;
+  }
+
+  /* Meeting: stage and bar on the left, chat on the right, filling the window. */
+  .meet {
+    height: 100%;
+    min-height: 0;
+  }
+
+  .meet-people {
+    display: flex;
+  }
+
+  .meet-body {
+    flex: 1;
+    flex-direction: row;
+    gap: 16px;
+    min-height: 0;
+  }
+
+  .meet-main {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .meet-stage {
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+    aspect-ratio: auto;
+  }
+
+  .meet-surface.tile {
+    width: 22%;
+    max-width: 280px;
+  }
+
+  .meet-chat {
+    flex-shrink: 0;
+    width: 340px;
+  }
+
+  .meet-chat-list {
+    flex: 1;
+    max-height: none;
+  }
+
+  .meet-main .ink-tools {
+    position: absolute;
+    z-index: 8;
+    top: 12px;
+    left: 12px;
+    flex-direction: column;
+    max-height: calc(100% - 104px);
+    padding: 8px;
+    overflow-y: auto;
+  }
+
+  .meet-main .ink-group {
+    display: grid;
+    grid-template-columns: repeat(2, 36px);
+    justify-items: center;
+  }
+
+  .meet-main .ink-group.colors {
+    row-gap: 6px;
+  }
+
+  .meet-main .ink-sep {
+    width: 100%;
+    height: 1px;
+  }
+
+  .meet-main .snap-card {
+    position: absolute;
+    z-index: 9;
+    right: 16px;
+    bottom: 92px;
+    width: 300px;
+  }
+}
+
+/* Full screen: stage fills the screen (chat only where there's room). */
+.meet.full {
+  height: 100vh;
+  padding: 12px;
+  background: var(--bg);
+}
+
+.meet.full .meet-body,
+.meet.full .meet-main {
+  flex: 1;
+  min-height: 0;
+}
+
+.meet.full .meet-stage {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  aspect-ratio: auto;
+}
+
+@media (max-width: 1023px) {
+  .meet.full .meet-chat {
+    display: none;
+  }
 }
 
 /* --- theme picker (settings) --- */
@@ -2655,8 +3572,11 @@ select {
   box-shadow: var(--raise);
 }
 
+:root[data-theme='soft'] .dock-items {
+  column-gap: 6px;
+}
+
 :root[data-theme='soft'] .dock {
-  column-gap: 10px;
   padding: 8px 10px;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
@@ -2854,6 +3774,46 @@ select {
 
 :root[data-theme='soft'] .qr {
   box-shadow: var(--raise-sm);
+}
+
+/* Screen sharing and the desktop sidebar, shaped like the rest of Soft. */
+:root[data-theme='soft'] :is(.meet-btn, .ink-btn).active {
+  background: var(--well);
+  box-shadow: var(--inset);
+  color: var(--blue-text);
+}
+
+:root[data-theme='soft'] :is(.meet-btn, .ink-btn):hover:not(:disabled, .active, .primary, .danger) {
+  background: var(--well);
+}
+
+:root[data-theme='soft'] .meet-btn.primary {
+  background: linear-gradient(145deg, #a4c9ff, #84b2f6);
+  color: var(--on-pastel);
+  box-shadow: var(--raise-sm);
+}
+
+:root[data-theme='soft'] :is(.dock-status, .meet-person) {
+  background: var(--well);
+  box-shadow: var(--inset);
+}
+
+:root[data-theme='soft'] .meet-peek {
+  background: var(--bg);
+}
+
+:root[data-theme='soft'] :is(.feature-icon, .quick-action .option-icon) {
+  color: var(--blue-text);
+}
+
+@media (min-width: 1024px) {
+  :root[data-theme='soft'] .dock-items {
+    row-gap: 6px;
+  }
+
+  :root[data-theme='soft'] .dock-item {
+    border-radius: 16px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
 import { screenShare, useScreenShare } from '../hooks/useScreenShare';
 import { useSession } from '../hooks/useSession';
 import type { StreamStats } from '../lib/webrtc/media';
@@ -79,23 +79,104 @@ export function LivePill() {
   );
 }
 
+type Corner = 'tl' | 'tr' | 'bl' | 'br';
+const CORNERS: readonly Corner[] = ['tl', 'tr', 'bl', 'br'];
+const CORNER_KEY = 'theshare.miniCorner';
+
+function savedCorner(): Corner {
+  try {
+    const value = localStorage.getItem(CORNER_KEY) as Corner | null;
+    if (value && CORNERS.includes(value)) return value;
+  } catch {
+    // Storage blocked: use the default.
+  }
+  // Top right: the bottom has the dock, the chat box and its Send button.
+  return 'tr';
+}
+
 /**
  * The other side's screen in a small floating player while another tab is
  * open, so watching doesn't stop when you go send a file. Tap opens the
- * Screen tab; the X hides it until their next share.
+ * Screen tab; drag it to any corner (remembered); the X hides it until their
+ * next share.
  */
 export function ScreenMini({ onOpen }: { onOpen: () => void }) {
   const { remote, remoteSince, remoteAudio, soundOn } = useScreenShare();
   const { peerName } = useSession();
   const [hiddenFor, setHiddenFor] = useState<number | null>(null);
+  const [corner, setCorner] = useState<Corner>(savedCorner);
+  const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
+  const press = useRef<{ px: number; py: number; left: number; top: number; moved: boolean } | null>(null);
+  const dragged = useRef(false);
   if (!remote || hiddenFor === remoteSince) return null;
+
+  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.button > 0) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    press.current = { px: e.clientX, py: e.clientY, left: r.left, top: r.top, moved: false };
+  };
+  const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const p = press.current;
+    if (!p) return;
+    const dx = e.clientX - p.px;
+    const dy = e.clientY - p.py;
+    if (!p.moved) {
+      if (Math.hypot(dx, dy) < 6) return;
+      // Capture only once it's a drag, so a plain tap still clicks the player.
+      p.moved = true;
+      e.currentTarget.setPointerCapture(e.pointerId);
+    }
+    setDrag({ x: p.left + dx, y: p.top + dy });
+  };
+  const onPointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const p = press.current;
+    press.current = null;
+    if (!p?.moved) return;
+    dragged.current = true;
+    const r = e.currentTarget.getBoundingClientRect();
+    const next = `${r.top + r.height / 2 < innerHeight / 2 ? 't' : 'b'}${r.left + r.width / 2 < innerWidth / 2 ? 'l' : 'r'}` as Corner;
+    setCorner(next);
+    setDrag(null);
+    try {
+      localStorage.setItem(CORNER_KEY, next);
+    } catch {
+      // Not remembered this time.
+    }
+  };
+
   return (
-    <div className="screen-mini" data-testid="screen-mini">
-      <button type="button" className="screen-mini-open" onClick={onOpen} aria-label={`${peerName ?? 'Karşı cihaz'} ekranını aç`}>
+    <div
+      className={`screen-mini corner-${corner}${drag ? ' dragging' : ''}`}
+      style={drag ? { left: drag.x, top: drag.y, right: 'auto', bottom: 'auto' } : undefined}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={() => {
+        press.current = null;
+        setDrag(null);
+      }}
+      data-testid="screen-mini"
+    >
+      <button
+        type="button"
+        className="screen-mini-open"
+        onClick={() => {
+          if (dragged.current) dragged.current = false;
+          else onOpen();
+        }}
+        aria-label={`${peerName ?? 'Karşı cihaz'} ekranını aç`}
+        title="Açmak için dokunun, taşımak için sürükleyin"
+      >
         <StreamVideo stream={remote} muted={!remoteAudio || !soundOn} onAutoMuted={() => screenShare.setSoundOn(false)} />
         <LivePill />
       </button>
-      <button type="button" className="screen-mini-close" onClick={() => setHiddenFor(remoteSince)} aria-label="Küçük oynatıcıyı gizle">
+      <button
+        type="button"
+        className="screen-mini-close"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={() => setHiddenFor(remoteSince)}
+        aria-label="Küçük oynatıcıyı gizle"
+      >
         <Icon name="close" />
       </button>
     </div>

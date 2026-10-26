@@ -1,4 +1,4 @@
-import type { MediaMessage } from '../transfer/protocol';
+import type { InkMessage, MediaMessage } from '../transfer/protocol';
 import type { PeerLink } from './peer';
 
 /**
@@ -14,6 +14,7 @@ import type { PeerLink } from './peer';
  */
 
 export type ScreenQuality = 'detail' | 'motion';
+export const SCREEN_QUALITIES: readonly ScreenQuality[] = ['detail', 'motion'];
 
 interface Preset {
   frameRate: number;
@@ -136,7 +137,8 @@ export class MediaLink {
     await this.applyQuality();
   }
 
-  handle(msg: MediaMessage): void {
+  /** Drawings (ink, point) are handled by hooks/useInk instead. */
+  handle(msg: Exclude<MediaMessage, InkMessage>): void {
     if (this.disposed) return;
     switch (msg.t) {
       case 'screen':

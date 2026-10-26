@@ -18,11 +18,13 @@
  *   cancel {id} may be sent by either side at any time.
  *
  * Screen sharing (lib/webrtc/media) adds media tracks to the same connection;
- * the renegotiation that needs (sdp, ice) and the share's state (screen,
- * screen-ask, screen-no) travel as control messages too.
+ * the renegotiation that needs (sdp, ice), the share's state (screen,
+ * screen-ask, screen-no) and drawings on it (ink, point; lib/ink) travel as
+ * control messages too.
  */
 
 import { cleanPeerName, parseDeviceType, type DeviceKind, type DeviceOs } from '../device';
+import { parseStroke, type Stroke } from '../ink';
 
 export const PROTOCOL_VERSION = 1;
 export const MAX_FILES_PER_TRANSFER = 500;
@@ -66,7 +68,21 @@ export type MediaMessage =
   /** The viewer asks to see the other side's screen… */
   | { t: 'screen-ask' }
   /** …and the answer when it won't come: declined, or this browser can't capture its screen. */
-  | { t: 'screen-no'; unsupported?: boolean };
+  | { t: 'screen-no'; unsupported?: boolean }
+  | InkMessage;
+
+/**
+ * Drawing on a shared screen. `on` is from the sender's point of view: 'mine'
+ * is the screen the sender shares, 'yours' the one the receiver shares.
+ */
+export type InkMessage =
+  | { t: 'ink'; on: InkTarget; op: 'put'; stroke: Stroke }
+  | { t: 'ink'; on: InkTarget; op: 'del'; id: string }
+  | { t: 'ink'; on: InkTarget; op: 'clear' }
+  /** Laser pointer position (transient, not kept). */
+  | { t: 'point'; on: InkTarget; x: number; y: number };
+
+export type InkTarget = 'mine' | 'yours';
 
 const isId = (v: unknown): v is string => typeof v === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(v);
 const isCount = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0;
@@ -148,6 +164,19 @@ export function parseControl(text: string): ControlMessage | null {
       return { t: 'screen-ask' };
     case 'screen-no':
       return { t: 'screen-no', ...(m.unsupported === true ? { unsupported: true } : {}) };
+    case 'ink': {
+      if (m.on !== 'mine' && m.on !== 'yours') return null;
+      if (m.op === 'put') {
+        const stroke = parseStroke(m.stroke);
+        return stroke ? { t: 'ink', on: m.on, op: 'put', stroke } : null;
+      }
+      if (m.op === 'del') return isId(m.id) ? { t: 'ink', on: m.on, op: 'del', id: m.id } : null;
+      return m.op === 'clear' ? { t: 'ink', on: m.on, op: 'clear' } : null;
+    }
+    case 'point': {
+      const ok = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && v >= -0.5 && v <= 1.5;
+      return (m.on === 'mine' || m.on === 'yours') && ok(m.x) && ok(m.y) ? { t: 'point', on: m.on, x: m.x as number, y: m.y as number } : null;
+    }
     default:
       return null;
   }

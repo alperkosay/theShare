@@ -37,6 +37,20 @@ const PATHS = {
   volume: 'M4 9h4l5-4v14l-5-4H4zM16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12',
   muted: 'M4 9h4l5-4v14l-5-4H4zM17 9.5l5 5M22 9.5l-5 5',
   eye: 'M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6',
+  pen: 'M4 20l4-1 11-11a2.1 2.1 0 0 0-3-3L5 16zM14 7l3 3',
+  marker: 'M4 20h7M8 16l9-12 3 2.5-8 11.5zM8 16l4 2',
+  line: 'M5 19 19 5',
+  arrowShape: 'M5 19 19 5M10 5h9v9',
+  rect: 'M4 6h16v12H4z',
+  ellipse: 'M12 5c4.4 0 8 3.1 8 7s-3.6 7-8 7-8-3.1-8-7 3.6-7 8-7',
+  laser: 'M12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2',
+  eraser: 'M15 4l5 5-9 9H7l-3-3zM10 9l5 5M9 20h11',
+  undo: 'M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3',
+  chat: 'M4 5h16v11H10l-5 4v-4H4z',
+  popout: 'M14 4h6v6M20 4l-8 8M18 14v6H4V6h6',
+  swap: 'M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7',
+  draw: 'M3 21c3 0 4-2 5-4M8 17l-2-2 9.5-9.5a2.1 2.1 0 0 1 3 3zM14 7l3 3',
+  hd: 'M3 6h18v12H3zM7 10v4M10 10v4M7 12h3M13 10h2a2 2 0 0 1 0 4h-2z',
 } as const;
 
 export type IconName = keyof typeof PATHS;

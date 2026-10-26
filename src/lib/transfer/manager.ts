@@ -368,6 +368,8 @@ export class TransferManager {
       case 'screen':
       case 'screen-ask':
       case 'screen-no':
+      case 'ink':
+      case 'point':
         return this.onMedia(msg);
     }
   }

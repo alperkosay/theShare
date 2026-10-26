@@ -13,6 +13,9 @@ import { HostScreen } from './HostScreen';
 import { JoinScreen } from './JoinScreen';
 import { NearbyConnectScreen } from './NearbyConnectScreen';
 import { AirScreen, type AirMode } from './AirScreen';
+import type { Tab } from '../components/Dock';
+import { useScreenShare } from '../hooks/useScreenShare';
+import type { IconName } from '../components/Icon';
 
 export interface UrlInvite {
   /** 6-digit code from …/#k=482913 */
@@ -26,12 +29,21 @@ interface Props {
   /** Zero-connection (QR stream) screen, if open. Lives in App, which turns network discovery off for it. */
   air: AirMode | null;
   onAir: (mode: AirMode | null) => void;
+  /** Jump to another tab (quick actions once connected). */
+  onOpen: (tab: Tab) => void;
 }
 
 /** "Devices" tab: discovery and pairing flows, or the current connection. */
-export function DevicesTab({ invite, air, onAir }: Props) {
+export function DevicesTab({ invite, air, onAir, onOpen }: Props) {
   const state = useSession();
-  if (state.wasConnected) return <ConnectedView />;
+  if (state.wasConnected) {
+    return (
+      <div className="connected-grid">
+        <ConnectedView />
+        <QuickActions onOpen={onOpen} />
+      </div>
+    );
+  }
   if (air && !state.role) return <AirScreen mode={air} onBack={() => onAir(null)} />;
   if (state.method === 'nearby' && state.role) return <NearbyConnectScreen />;
   if (state.role === 'host') return state.method === 'code' ? <CodeHostScreen /> : <HostScreen />;
@@ -47,68 +59,103 @@ function HomeView({ onAir }: { onAir: (mode: AirMode) => void }) {
       <header className="brand rise">
         <Logo />
         <div className="grow">
-          <h1>theShare</h1>
+          {/* Desktop: the sidebar already shows the brand, so the page names what to do here. */}
+          <h1>
+            <span className="brand-mobile">theShare</span>
+            <span className="brand-desktop">Cihaz bağlayın</span>
+          </h1>
           <p className="small muted">Sunucusuz, cihazdan cihaza paylaşım</p>
         </div>
         <ProfileChip />
       </header>
 
-      <div className="rise" style={{ '--i': 1 } as CSSProperties}>
-        <Radar />
-      </div>
+      <div className="home-grid">
+        <div className="home-col rise" style={{ '--i': 1 } as CSSProperties}>
+          <Radar />
+        </div>
 
-      <RecentRooms />
+        <div className="home-col">
+          <RecentRooms />
 
-      <div className="options">
-        <section className="glass option rise" style={{ '--i': 2 } as CSSProperties}>
-          <span className="option-icon">
-            <Icon name="globe" />
-          </span>
-          <h2>Uzaktaki cihaz</h2>
-          <p className="small muted">Farklı ağdaki biriyle 6 haneli kodla.</p>
-          <div className="actions">
-            <button type="button" className="btn primary" onClick={() => session.startCodeHost()} data-testid="start-host">
-              Kod oluştur
-            </button>
-            <button type="button" className="btn" onClick={() => session.reset({ role: 'join', method: 'code' })} data-testid="start-join">
-              Kod gir
-            </button>
+          <div className="options">
+            <section className="glass option rise" style={{ '--i': 2 } as CSSProperties}>
+              <span className="option-icon">
+                <Icon name="globe" />
+              </span>
+              <h2>Uzaktaki cihaz</h2>
+              <p className="small muted">Farklı ağdaki biriyle 6 haneli kodla.</p>
+              <div className="actions">
+                <button type="button" className="btn primary" onClick={() => session.startCodeHost()} data-testid="start-host">
+                  Kod oluştur
+                </button>
+                <button type="button" className="btn" onClick={() => session.reset({ role: 'join', method: 'code' })} data-testid="start-join">
+                  Kod gir
+                </button>
+              </div>
+            </section>
+
+            <section className="glass option rise" style={{ '--i': 3 } as CSSProperties}>
+              <span className="option-icon">
+                <Icon name="qr" />
+              </span>
+              <h2>İnternetsiz</h2>
+              <p className="small muted">Aynı Wi-Fi'da, internet olmadan QR ile.</p>
+              <div className="actions">
+                <button type="button" className="btn" onClick={() => void session.startHost()} data-testid="qr-host">
+                  QR göster
+                </button>
+                <button type="button" className="btn" onClick={() => session.reset({ role: 'join', method: 'qr' })} data-testid="qr-join">
+                  QR tara
+                </button>
+              </div>
+            </section>
+
+            <section className="glass option wide rise" style={{ '--i': 4 } as CSSProperties}>
+              <span className="option-icon">
+                <Icon name="frames" />
+              </span>
+              <h2>Sıfır bağlantı</h2>
+              <p className="small muted">Hiçbir ağ yok: veri ekrandan kameraya akan QR'larla gider. Küçük dosya ve metin için.</p>
+              <div className="actions">
+                <button type="button" className="btn" onClick={() => onAir('send')} data-testid="air-send">
+                  Gönder
+                </button>
+                <button type="button" className="btn" onClick={() => onAir('receive')} data-testid="air-receive">
+                  Al
+                </button>
+              </div>
+            </section>
           </div>
-        </section>
-
-        <section className="glass option rise" style={{ '--i': 3 } as CSSProperties}>
-          <span className="option-icon">
-            <Icon name="qr" />
-          </span>
-          <h2>İnternetsiz</h2>
-          <p className="small muted">Aynı Wi-Fi'da, internet olmadan QR ile.</p>
-          <div className="actions">
-            <button type="button" className="btn" onClick={() => void session.startHost()} data-testid="qr-host">
-              QR göster
-            </button>
-            <button type="button" className="btn" onClick={() => session.reset({ role: 'join', method: 'qr' })} data-testid="qr-join">
-              QR tara
-            </button>
-          </div>
-        </section>
-
-        <section className="glass option wide rise" style={{ '--i': 4 } as CSSProperties}>
-          <span className="option-icon">
-            <Icon name="frames" />
-          </span>
-          <h2>Sıfır bağlantı</h2>
-          <p className="small muted">Hiçbir ağ yok: veri ekrandan kameraya akan QR'larla gider. Küçük dosya ve metin için.</p>
-          <div className="actions">
-            <button type="button" className="btn" onClick={() => onAir('send')} data-testid="air-send">
-              Gönder
-            </button>
-            <button type="button" className="btn" onClick={() => onAir('receive')} data-testid="air-receive">
-              Al
-            </button>
-          </div>
-        </section>
+        </div>
       </div>
     </>
+  );
+}
+
+/** Shortcuts to what you can do now that you're connected. */
+function QuickActions({ onOpen }: { onOpen: (tab: Tab) => void }) {
+  const { supported } = useScreenShare();
+  const actions: Array<[Tab, IconName, string, string]> = [
+    ['files', 'files', 'Dosya gönder', 'Sürükleyip bırakın, istersen tek ZIP olarak.'],
+    ['clipboard', 'clipboard', 'Metin ve pano', 'Not, bağlantı ya da panodaki her şey.'],
+    ['screen', 'screen', supported ? 'Ekran paylaş' : 'Ekranı izle', supported ? 'Çizim, lazer işaretçi ve sohbetle.' : 'Bilgisayardan paylaşılan ekranı izleyin.'],
+    ['history', 'history', 'Geçmiş', 'Gönderdikleriniz ve aldıklarınız.'],
+  ];
+  return (
+    <section className="quick-actions" aria-label="Hızlı işlemler">
+      {actions.map(([tab, icon, title, text], i) => (
+        <button key={tab} type="button" className={`glass quick-action qa-${tab} rise`} style={{ '--i': i + 1 } as CSSProperties} onClick={() => onOpen(tab)}>
+          <span className="option-icon">
+            <Icon name={icon} />
+          </span>
+          <span className="grow">
+            <strong className="block">{title}</strong>
+            <span className="small muted">{text}</span>
+          </span>
+          <Icon name="chevron" className="qa-chevron" />
+        </button>
+      ))}
+    </section>
   );
 }
 

@@ -59,61 +59,70 @@ export function FilesTab({ onOpenDevices }: { onOpenDevices: () => void }) {
     <>
       <PeerBar onOpen={onOpenDevices} />
 
-      <input
-        ref={inputRef}
-        type="file"
-        multiple
-        hidden
-        data-testid="file-input"
-        onChange={(e) => {
-          const files = Array.from(e.target.files ?? []);
-          e.target.value = '';
-          void send(files);
-        }}
-      />
-      <button
-        type="button"
-        className={`dropzone rise${dragging ? ' over' : ''}`}
-        disabled={!canSend}
-        onClick={() => void pick()}
-        onDragOver={(e) => {
-          if (!canSend || !e.dataTransfer.types.includes('Files')) return;
-          e.preventDefault();
-          setDragging(true);
-        }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragging(false);
-          void filesFromDrop(e.dataTransfer).then(send);
-        }}
-      >
-        <span className="dropzone-icon">
-          <Icon name="upload" />
-        </span>
-        <strong>{zipping ? 'ZIP hazırlanıyor…' : sending ? 'Gönderim sürüyor…' : connected ? 'Dosya gönder' : 'Bağlantı yok'}</strong>
-        <span className="small muted">{connected ? 'Dokunun ya da dosyaları buraya bırakın' : 'Yeni gönderim için yeniden bağlanın'}</span>
-      </button>
+      <div className="files-layout">
+        <div className="files-compose">
+          <input
+            ref={inputRef}
+            type="file"
+            multiple
+            hidden
+            data-testid="file-input"
+            onChange={(e) => {
+              const files = Array.from(e.target.files ?? []);
+              e.target.value = '';
+              void send(files);
+            }}
+          />
+          <button
+            type="button"
+            className={`dropzone rise${dragging ? ' over' : ''}`}
+            disabled={!canSend}
+            onClick={() => void pick()}
+            onDragOver={(e) => {
+              if (!canSend || !e.dataTransfer.types.includes('Files')) return;
+              e.preventDefault();
+              setDragging(true);
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragging(false);
+              void filesFromDrop(e.dataTransfer).then(send);
+            }}
+          >
+            <span className="dropzone-icon">
+              <Icon name="upload" />
+            </span>
+            <strong>{zipping ? 'ZIP hazırlanıyor…' : sending ? 'Gönderim sürüyor…' : connected ? 'Dosya gönder' : 'Bağlantı yok'}</strong>
+            <span className="small muted">{connected ? 'Dokunun ya da dosyaları buraya bırakın' : 'Yeni gönderim için yeniden bağlanın'}</span>
+          </button>
 
-      <label className="check small muted">
-        <input type="checkbox" checked={asZip} onChange={(e) => setAsZip(e.target.checked)} data-testid="zip-toggle" />
-        <span className="switch" aria-hidden="true" />
-        Birden çok dosyayı tek ZIP olarak gönder
-      </label>
+          <label className="check small muted">
+            <input type="checkbox" checked={asZip} onChange={(e) => setAsZip(e.target.checked)} data-testid="zip-toggle" />
+            <span className="switch" aria-hidden="true" />
+            Birden çok dosyayı tek ZIP olarak gönder
+          </label>
 
-      <PendingList connected={connected} />
+          <PendingList connected={connected} />
+        </div>
 
-      <section className="stack" aria-label="Aktarımlar">
-        {transfers.length === 0 ? (
-          <p className="small muted center">Gönderdiğiniz ve gelen dosyalar burada görünür.</p>
-        ) : (
-          transfers.map((t, i) => (
-            <div key={t.id} className="rise" style={{ '--i': Math.min(i, 6) } as CSSProperties}>
-              <TransferCard transfer={t} />
+        <section className="stack files-list" aria-label="Aktarımlar">
+          {transfers.length === 0 ? (
+            <div className="glass empty-list">
+              <span className="avatar">
+                <Icon name="files" />
+              </span>
+              <p className="small muted">Gönderdiğiniz ve gelen dosyalar burada görünür.</p>
             </div>
-          ))
-        )}
-      </section>
+          ) : (
+            transfers.map((t, i) => (
+              <div key={t.id} className="rise" style={{ '--i': Math.min(i, 6) } as CSSProperties}>
+                <TransferCard transfer={t} />
+              </div>
+            ))
+          )}
+        </section>
+      </div>
     </>
   );
 }

@@ -13,6 +13,8 @@ import { HistoryTab } from './screens/HistoryTab';
 import { ScreenTab } from './screens/ScreenTab';
 import { useScreenShare } from './hooks/useScreenShare';
 import { ScreenAskPrompt, ScreenMini } from './components/ScreenShare';
+import { PopOutHost } from './components/PopOut';
+import { usePopout } from './hooks/usePopout';
 import { Dock, type Tab } from './components/Dock';
 import { RequestSheet } from './components/Radar';
 import { UpdatePrompt } from './components/UpdatePrompt';
@@ -41,6 +43,7 @@ export function App() {
   const transferring = state.transfers.some((t) => t.status === 'active' || t.status === 'finishing');
   const screen = useScreenShare();
   const streaming = screen.local !== null || screen.remote !== null;
+  const popoutOpen = usePopout() !== null;
 
   // A share also needs the screen on (and the page open) to keep going.
   useKeepAlive(transferring || streaming);
@@ -69,9 +72,11 @@ export function App() {
   // Unread badges for the tabs you're not looking at.
   const incomingTexts = state.messages.filter((m) => m.direction === 'in').length;
   const [seenTexts, setSeenTexts] = useState(0);
+  // The meeting's chat shows the same messages, so they count as seen there too.
+  const textsVisible = tab === 'clipboard' || (tab === 'screen' && streaming);
   useEffect(() => {
-    if (tab === 'clipboard' || incomingTexts === 0) setSeenTexts(incomingTexts);
-  }, [tab, incomingTexts]);
+    if (textsVisible || incomingTexts === 0) setSeenTexts(incomingTexts);
+  }, [textsVisible, incomingTexts]);
   const pendingOffers = state.transfers.filter((t) => t.direction === 'in' && t.status === 'pending').length;
 
   let content;
@@ -79,12 +84,15 @@ export function App() {
   else if (tab === 'clipboard') content = <ClipboardTab onOpenDevices={() => setTab('devices')} />;
   else if (tab === 'screen') content = <ScreenTab onOpenDevices={() => setTab('devices')} />;
   else if (tab === 'history') content = <HistoryTab onOpenFiles={() => setTab('files')} />;
-  else content = <DevicesTab invite={invite} air={air} onAir={setAir} />;
+  else content = <DevicesTab invite={invite} air={air} onAir={setAir} onOpen={setTab} />;
+
+  // Desktop: pairing flows stay a narrow column; everything else uses the width.
+  const wide = tab !== 'devices' || state.wasConnected || (!air && state.role === null);
 
   return (
     <div className={`app${transferring ? ' busy' : ''}`} data-testid="link-status" data-state={state.linkState}>
       {/* key: remount per tab so its content plays the entrance animation */}
-      <main className={`screen tab-${tab}`} key={tab}>
+      <main className={`screen tab-${tab}${wide ? ' wide' : ''}${tab === 'screen' && streaming ? ' meeting' : ''}`} key={tab}>
         {content}
       </main>
       <Dock
@@ -92,11 +100,12 @@ export function App() {
         onChange={setTab}
         badges={{
           files: tab === 'files' ? 0 : pendingOffers,
-          clipboard: tab === 'clipboard' ? 0 : incomingTexts - seenTexts,
+          clipboard: textsVisible ? 0 : incomingTexts - seenTexts,
           screen: tab !== 'screen' && screen.remote ? 'live' : 0,
         }}
       />
-      {tab !== 'screen' && <ScreenMini onOpen={() => setTab('screen')} />}
+      {tab !== 'screen' && !popoutOpen && <ScreenMini onOpen={() => setTab('screen')} />}
+      <PopOutHost />
       <ScreenAskPrompt onShare={() => setTab('screen')} />
       <RequestSheet />
       <UpdatePrompt busy={transferring} />

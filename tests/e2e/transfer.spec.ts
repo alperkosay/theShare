@@ -516,7 +516,19 @@ function fakeScreenPicker() {
   };
 }
 
-test('screen sharing: on request, both ways at once, mini player, snapshot, stop and share again with sound', async ({ browser }) => {
+/** Drags across a canvas from one point to another, in fractions of its size. */
+async function dragOn(page: Page, testId: string, from: [number, number], to: [number, number]) {
+  const box = (await page.getByTestId(testId).boundingBox())!;
+  const at = ([x, y]: [number, number]) => [box.x + x * box.width, box.y + y * box.height] as const;
+  await page.mouse.move(...at(from));
+  await page.mouse.down();
+  for (let i = 1; i <= 8; i++) {
+    await page.mouse.move(...at([from[0] + ((to[0] - from[0]) * i) / 8, from[1] + ((to[1] - from[1]) * i) / 8]));
+  }
+  await page.mouse.up();
+}
+
+test('screen sharing: request, drawing both ways, chat, snapshot, both share, mini player, stop, share again with sound', async ({ browser }) => {
   const pages: Page[] = [];
   for (let i = 0; i < 2; i++) {
     const context = await browser.newContext();
@@ -527,7 +539,7 @@ test('screen sharing: on request, both ways at once, mini player, snapshot, stop
   await pair(host, joiner);
   for (const page of pages) await page.getByTestId('tab-screen').click();
 
-  // The joiner asks; the host accepts from the prompt and the picture arrives.
+  // The joiner asks; the host accepts from the prompt and the meeting opens on both sides.
   await joiner.getByTestId('screen-ask').click();
   await host.getByTestId('screen-ask-accept').click();
   await expect(host.getByTestId('local-screen')).toBeVisible();
@@ -535,22 +547,48 @@ test('screen sharing: on request, both ways at once, mini player, snapshot, stop
   await expect(atJoiner).toHaveAttribute('data-ready', 'true', { timeout: 30_000 });
   await expect(atJoiner).toHaveAttribute('data-size', '640x360');
 
-  // A snapshot of the received picture is saved as a PNG.
-  const [snapshot] = await Promise.all([joiner.waitForEvent('download'), joiner.getByTestId('screen-snapshot').click()]);
+  // The viewer draws on the shared screen: a pen stroke and an arrow show up on the sharer's side.
+  await joiner.getByTestId('ink-toggle').click();
+  await expect(joiner.getByTestId('ink-tools')).toBeVisible();
+  await dragOn(joiner, 'ink-remote', [0.2, 0.3], [0.5, 0.6]);
+  await joiner.getByTestId('ink-mode-arrow').click();
+  await dragOn(joiner, 'ink-remote', [0.6, 0.2], [0.8, 0.5]);
+  await expect(host.getByTestId('ink-local')).toHaveAttribute('data-strokes', '2');
+  // Undo takes back the arrow; the sharer clears the rest for both.
+  await joiner.getByTestId('ink-undo').click();
+  await expect(host.getByTestId('ink-local')).toHaveAttribute('data-strokes', '1');
+  await host.getByTestId('ink-toggle').click();
+  await host.getByTestId('ink-clear').click();
+  await expect(joiner.getByTestId('ink-remote')).toHaveAttribute('data-strokes', '0');
+  await host.keyboard.press('Escape');
+  await expect(host.getByTestId('ink-tools')).toBeHidden();
+
+  // The chat beside the stage (Enter sends) reaches the other side's chat.
+  await joiner.getByTestId('meet-chat').getByTestId('text-input').fill('Şu butona bak');
+  await joiner.getByTestId('meet-chat').getByTestId('text-input').press('Enter');
+  await expect(host.getByTestId('meet-chat').getByTestId('message').last()).toContainText('Şu butona bak');
+
+  // A snapshot can be saved as a PNG, or sent over as a file.
+  await joiner.getByTestId('screen-snapshot').click();
+  const [snapshot] = await Promise.all([joiner.waitForEvent('download'), joiner.getByTestId('snapshot-save').click()]);
   expect(snapshot.suggestedFilename()).toMatch(/^ekran-.*\.png$/);
+  await joiner.getByTestId('screen-snapshot').click();
+  await joiner.getByTestId('snapshot-send').click();
+  await expect(joiner.getByTestId('snapshot-card')).toBeHidden();
 
   // The joiner shares too: renegotiation the other way while the first share runs.
   await joiner.getByTestId('screen-share').click();
   await expect(host.getByTestId('remote-screen')).toHaveAttribute('data-ready', 'true', { timeout: 30_000 });
   await expect(atJoiner).toHaveAttribute('data-ready', 'true');
 
-  // On another tab the host keeps watching in the mini player.
+  // On another tab the host keeps watching in the mini player; the snapshot waits there too.
   await host.getByTestId('tab-files').click();
   await expect(host.getByTestId('screen-mini')).toBeVisible();
+  await expect(host.locator('[data-testid=transfer][data-direction=in]').first()).toHaveAttribute('data-status', 'pending');
   await joiner.getByTestId('screen-stop').click();
   await expect(host.getByTestId('screen-mini')).toBeHidden();
 
-  // The host stops; the joiner is back to the "not sharing" state.
+  // The host stops; the joiner is back in the lobby.
   await host.getByTestId('tab-screen').click();
   await host.getByTestId('screen-stop').click();
   await expect(atJoiner).toBeHidden();
