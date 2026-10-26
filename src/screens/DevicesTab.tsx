@@ -1,10 +1,10 @@
-import type { CSSProperties } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { session, useSession } from '../hooks/useSession';
 import { rooms, useRooms } from '../hooks/useRooms';
-import { deviceLabel, selfDevice } from '../lib/device';
+import { useNearby } from '../hooks/useNearby';
 import { formatCode } from '../lib/signaling/code-rendezvous';
 import { Radar } from '../components/Radar';
-import { DeviceIcon, Icon } from '../components/Icon';
+import { Icon } from '../components/Icon';
 import { ProfileChip } from '../components/Profile';
 import { Logo } from '../components/Logo';
 import { CodeHostScreen } from './CodeHostScreen';
@@ -14,8 +14,7 @@ import { JoinScreen } from './JoinScreen';
 import { NearbyConnectScreen } from './NearbyConnectScreen';
 import { AirScreen, type AirMode } from './AirScreen';
 import type { Tab } from '../components/Dock';
-import { useScreenShare } from '../hooks/useScreenShare';
-import type { IconName } from '../components/Icon';
+import { Hub } from './Hub';
 
 export interface UrlInvite {
   /** 6-digit code from …/#k=482913 */
@@ -36,14 +35,7 @@ interface Props {
 /** "Devices" tab: discovery and pairing flows, or the current connection. */
 export function DevicesTab({ invite, air, onAir, onOpen }: Props) {
   const state = useSession();
-  if (state.wasConnected) {
-    return (
-      <div className="connected-grid">
-        <ConnectedView />
-        <QuickActions onOpen={onOpen} />
-      </div>
-    );
-  }
+  if (state.wasConnected) return <Hub onOpen={onOpen} />;
   if (air && !state.role) return <AirScreen mode={air} onBack={() => onAir(null)} />;
   if (state.method === 'nearby' && state.role) return <NearbyConnectScreen />;
   if (state.role === 'host') return state.method === 'code' ? <CodeHostScreen /> : <HostScreen />;
@@ -54,6 +46,12 @@ export function DevicesTab({ invite, air, onAir, onOpen }: Props) {
 }
 
 function HomeView({ onAir }: { onAir: (mode: AirMode) => void }) {
+  // Same Wi-Fi usually shows up on the radar, so the QR card only takes room
+  // when asked for, or when the radar can't work (it needs internet).
+  const { status } = useNearby();
+  const [qrAsked, setQrAsked] = useState(false);
+  const showQr = qrAsked || status === 'unavailable';
+
   return (
     <>
       <header className="brand rise">
@@ -77,7 +75,7 @@ function HomeView({ onAir }: { onAir: (mode: AirMode) => void }) {
         <div className="home-col">
           <RecentRooms />
 
-          <div className="options">
+          <div className={`options${showQr ? '' : ' two'}`}>
             <section className="glass option rise" style={{ '--i': 2 } as CSSProperties}>
               <span className="option-icon">
                 <Icon name="globe" />
@@ -94,21 +92,23 @@ function HomeView({ onAir }: { onAir: (mode: AirMode) => void }) {
               </div>
             </section>
 
-            <section className="glass option rise" style={{ '--i': 3 } as CSSProperties}>
-              <span className="option-icon">
-                <Icon name="qr" />
-              </span>
-              <h2>İnternetsiz</h2>
-              <p className="small muted">Aynı Wi-Fi'da, internet olmadan QR ile.</p>
-              <div className="actions">
-                <button type="button" className="btn" onClick={() => void session.startHost()} data-testid="qr-host">
-                  QR göster
-                </button>
-                <button type="button" className="btn" onClick={() => session.reset({ role: 'join', method: 'qr' })} data-testid="qr-join">
-                  QR tara
-                </button>
-              </div>
-            </section>
+            {showQr && (
+              <section className="glass option rise" style={{ '--i': 3 } as CSSProperties} data-testid="qr-option">
+                <span className="option-icon">
+                  <Icon name="qr" />
+                </span>
+                <h2>İnternetsiz</h2>
+                <p className="small muted">Aynı Wi-Fi'da, internet olmadan QR ile.</p>
+                <div className="actions">
+                  <button type="button" className="btn" onClick={() => void session.startHost()} data-testid="qr-host">
+                    QR göster
+                  </button>
+                  <button type="button" className="btn" onClick={() => session.reset({ role: 'join', method: 'qr' })} data-testid="qr-join">
+                    QR tara
+                  </button>
+                </div>
+              </section>
+            )}
 
             <section className="glass option wide rise" style={{ '--i': 4 } as CSSProperties}>
               <span className="option-icon">
@@ -126,36 +126,16 @@ function HomeView({ onAir }: { onAir: (mode: AirMode) => void }) {
               </div>
             </section>
           </div>
+
+          {!showQr && (
+            <button type="button" className="link small" onClick={() => setQrAsked(true)} data-testid="qr-reveal">
+              <Icon name="qr" />
+              İnternet yok mu? Aynı Wi-Fi'da QR ile bağlan
+            </button>
+          )}
         </div>
       </div>
     </>
-  );
-}
-
-/** Shortcuts to what you can do now that you're connected. */
-function QuickActions({ onOpen }: { onOpen: (tab: Tab) => void }) {
-  const { supported } = useScreenShare();
-  const actions: Array<[Tab, IconName, string, string]> = [
-    ['files', 'files', 'Dosya gönder', 'Sürükleyip bırakın, istersen tek ZIP olarak.'],
-    ['clipboard', 'clipboard', 'Metin ve pano', 'Not, bağlantı ya da panodaki her şey.'],
-    ['screen', 'screen', supported ? 'Ekran paylaş' : 'Ekranı izle', supported ? 'Çizim, lazer işaretçi ve sohbetle.' : 'Bilgisayardan paylaşılan ekranı izleyin.'],
-    ['history', 'history', 'Geçmiş', 'Gönderdikleriniz ve aldıklarınız.'],
-  ];
-  return (
-    <section className="quick-actions" aria-label="Hızlı işlemler">
-      {actions.map(([tab, icon, title, text], i) => (
-        <button key={tab} type="button" className={`glass quick-action qa-${tab} rise`} style={{ '--i': i + 1 } as CSSProperties} onClick={() => onOpen(tab)}>
-          <span className="option-icon">
-            <Icon name={icon} />
-          </span>
-          <span className="grow">
-            <strong className="block">{title}</strong>
-            <span className="small muted">{text}</span>
-          </span>
-          <Icon name="chevron" className="qa-chevron" />
-        </button>
-      ))}
-    </section>
   );
 }
 
@@ -191,80 +171,6 @@ function RecentRooms() {
           </li>
         ))}
       </ul>
-    </section>
-  );
-}
-
-function ConnectedView() {
-  const { linkState, peerName, peer, pairingCode, error, transfers, method, role, pairCode } = useSession();
-  const self = selfDevice();
-  const connected = linkState === 'connected';
-  const room = method === 'code' && role && pairCode ? { code: pairCode, role } : null;
-
-  const confirmUnsaved = () => {
-    const unsaved = transfers.some((t) => t.received.some((r) => r.file && !r.downloaded));
-    return !unsaved || confirm('Kaydedilmemiş dosyalar silinecek. Devam edilsin mi?');
-  };
-  const leave = () => {
-    if (confirmUnsaved()) session.leave();
-  };
-  const rejoin = () => {
-    if (room && confirmUnsaved()) session.rejoinRoom(room.code, room.role);
-  };
-
-  return (
-    <section className={`glass link-hero rise${connected ? '' : ' off'}`}>
-      <p className="eyebrow">{connected ? 'Bağlı' : 'Bağlantı koptu'}</p>
-      <div className="link-pair">
-        <div className="link-end">
-          <span className="avatar big">
-            <DeviceIcon kind={self.kind} />
-          </span>
-          <strong>{self.name}</strong>
-          <span className="small muted">{deviceLabel(self)} · bu cihaz</span>
-        </div>
-        <span className={`beam${connected ? '' : ' broken'}`} aria-hidden="true">
-          <span />
-        </span>
-        <div className="link-end">
-          <span className="avatar big">
-            <DeviceIcon kind={peer?.kind ?? 'computer'} />
-          </span>
-          <strong>{peerName ?? 'Bağlı cihaz'}</strong>
-          <span className="small muted">{peer ? deviceLabel(peer) : '—'}</span>
-        </div>
-      </div>
-
-      {connected && pairingCode && (
-        <div className="security">
-          <span className="small muted">
-            <Icon name="shield" /> Güvenlik kodu
-          </span>
-          <strong className="code-digits">{pairingCode}</strong>
-          <span className="small muted">İki ekranda aynı olmalı. Farklıysa bağlantıyı hemen kesin.</span>
-        </div>
-      )}
-      {!connected && error && <p className="notice error">{error}</p>}
-
-      {room && (
-        <p className="small muted">
-          Oda <strong className="text">{formatCode(room.code)}</strong>
-          {connected ? ' · bağlantı koparsa aynı kodla geri dönebilirsiniz' : ''}
-        </p>
-      )}
-      {!connected && room && (
-        <>
-          <button type="button" className="btn primary" onClick={rejoin} data-testid="rejoin">
-            {room.role === 'host' ? 'Odayı yeniden aç' : 'Odaya tekrar gir'}
-          </button>
-          <p className="small muted">
-            {room.role === 'host' ? 'Karşı taraf aynı bağlantıyı ya da kodu tekrar kullanabilir.' : 'Odayı oluşturan cihazın da odayı yeniden açması gerekir.'}
-          </p>
-        </>
-      )}
-      <button type="button" className="btn danger" onClick={leave} data-testid="leave">
-        {connected ? 'Bağlantıyı kes' : 'Ana ekrana dön'}
-      </button>
     </section>
   );
 }

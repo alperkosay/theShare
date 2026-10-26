@@ -26,6 +26,15 @@ async function expectConnected(host: Page, joiner: Page): Promise<void> {
   await expect(host.getByTestId('pairing-code')).toHaveText(await joiner.getByTestId('pairing-code').innerText());
 }
 
+/** Clicks a QR button on the home screen; while nearby discovery works, that card hides behind a link. */
+async function clickQr(page: Page, testId: 'qr-host' | 'qr-join'): Promise<void> {
+  const reveal = page.getByTestId('qr-reveal');
+  const button = page.getByTestId(testId);
+  await expect(reveal.or(button).first()).toBeVisible();
+  if (await reveal.isVisible()) await reveal.click();
+  await button.click();
+}
+
 /**
  * Pairs two pages with the offline QR flow (codes pasted as text). No internet needed.
  * `reload: false` keeps the host page as it is (e.g. to keep its in-memory pending queue).
@@ -33,11 +42,11 @@ async function expectConnected(host: Page, joiner: Page): Promise<void> {
 async function pair(host: Page, joiner: Page, { reload = true } = {}): Promise<void> {
   if (reload) await host.goto('/');
   else await host.getByTestId('tab-devices').click();
-  await host.getByTestId('qr-host').click();
+  await clickQr(host, 'qr-host');
   const offer = await readCode(host, /#s=TS[1Z]\./);
 
   await joiner.goto('/');
-  await joiner.getByTestId('qr-join').click();
+  await clickQr(joiner, 'qr-join');
   await pasteCode(joiner, offer);
   const answer = await readCode(joiner, /^TS[1Z]\./);
 
@@ -145,7 +154,7 @@ test('cancel mid-transfer and disconnect are reported on the other side', async 
 
 test('invalid and mismatched codes show a clear error', async ({ page }) => {
   await page.goto('/');
-  await page.getByTestId('qr-join').click();
+  await clickQr(page, 'qr-join');
   await pasteCode(page, 'bu bir kod değil');
   await expect(page.getByRole('alert')).toContainText('theShare bağlantı kodu değil');
 
@@ -157,7 +166,7 @@ test('invalid and mismatched codes show a clear error', async ({ page }) => {
 test('opening the offer link directly starts joining', async ({ browser }) => {
   const { a: host, b: joiner } = await twoDevices(browser);
   await host.goto('/');
-  await host.getByTestId('qr-host').click();
+  await clickQr(host, 'qr-host');
   const offer = await readCode(host, /#s=TS[1Z]\./);
 
   await joiner.goto(offer.replace(/^https?:\/\/[^/]+/, ''));
@@ -604,4 +613,44 @@ test('screen sharing: request, drawing both ways, chat, snapshot, both share, mi
   await host.getByTestId('screen-share').click();
   await expect(atJoiner).toHaveAttribute('data-ready', 'true', { timeout: 30_000 });
   await expect(joiner.getByTestId('screen-sound')).toBeVisible();
+});
+
+test('desktop: command palette, paste anywhere, drop anywhere, accept from the hub feed', async ({ browser }) => {
+  const { a: host, b: joiner } = await twoDevices(browser);
+  await pair(host, joiner);
+
+  // Ctrl+K, type, Enter: the palette runs the command.
+  await host.keyboard.press('Control+K');
+  await expect(host.getByTestId('palette')).toBeVisible();
+  await host.getByTestId('palette-input').fill('geçmiş');
+  await host.getByTestId('palette-input').press('Enter');
+  await expect(host.getByTestId('palette')).toBeHidden();
+  await expect(host.getByTestId('tab-history')).toHaveAttribute('aria-current', 'page');
+
+  // Ctrl+V outside a text field: shown first, sent on Enter.
+  await host.evaluate(() => {
+    const data = new DataTransfer();
+    data.setData('text/plain', 'Ctrl+V ile geldi');
+    document.body.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+  });
+  await expect(host.getByTestId('paste-card')).toContainText('Ctrl+V ile geldi');
+  await host.keyboard.press('Enter');
+  await expect(host.getByTestId('paste-card')).toBeHidden();
+  await joiner.getByTestId('tab-clipboard').click();
+  await expect(joiner.getByTestId('message').last()).toContainText('Ctrl+V ile geldi');
+
+  // A file dropped anywhere on the window is offered; the receiver accepts it from the hub's feed.
+  await host.evaluate(() => {
+    const data = new DataTransfer();
+    data.items.add(new File(['merhaba'], 'birak.txt', { type: 'text/plain' }));
+    for (const type of ['dragenter', 'dragover', 'drop']) {
+      document.body.dispatchEvent(new DragEvent(type, { dataTransfer: data, bubbles: true, cancelable: true }));
+    }
+  });
+  await joiner.getByTestId('tab-devices').click();
+  await joiner.getByTestId('activity').getByRole('button', { name: 'Kabul et' }).click();
+  await joiner.getByTestId('tab-files').click();
+  const incoming = joiner.locator('[data-testid=transfer][data-direction=in]').first();
+  await expect(incoming).toHaveAttribute('data-status', 'done');
+  await expect(incoming).toContainText('birak.txt');
 });

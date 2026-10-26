@@ -661,6 +661,17 @@ textarea {
   flex-direction: row;
 }
 
+/* Two cards (QR hidden): the wide one sits beside the other like a normal card. */
+.options.two .option.wide {
+  grid-column: auto;
+}
+
+@media (min-width: 460px) {
+  .options.two .option.wide .actions {
+    flex-direction: column;
+  }
+}
+
 .option.wide .option-icon {
   background: var(--lemon);
 }
@@ -697,9 +708,10 @@ textarea {
   grid-template-columns: repeat(var(--items), 1fr);
 }
 
-/* Sidebar-only parts (desktop). */
+/* Rail-only parts (desktop). */
 .dock-brand,
-.dock-status {
+.dock-status,
+.dock-command {
   display: none;
 }
 
@@ -891,92 +903,6 @@ textarea {
   width: 16px;
   height: 16px;
   color: var(--ok);
-}
-
-.link-hero {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 18px;
-  padding: 22px 18px;
-  text-align: center;
-}
-
-.link-pair {
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  width: 100%;
-  gap: 4px;
-}
-
-.link-end {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  width: 40%;
-  min-width: 0;
-}
-
-.link-end strong {
-  overflow-wrap: anywhere;
-}
-
-.beam {
-  position: relative;
-  flex: 1;
-  height: 3px;
-  margin-top: 31px;
-  border-radius: 2px;
-  background: var(--glass-border);
-  overflow: hidden;
-}
-
-.beam span {
-  position: absolute;
-  inset: 0;
-  width: 40%;
-  border-radius: 2px;
-  background: var(--ink);
-  animation: beam 1.6s ease-in-out infinite;
-}
-
-.beam.broken span {
-  display: none;
-}
-
-@keyframes beam {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(260%);
-  }
-}
-
-.security {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
-
-.security .icon {
-  width: 14px;
-  height: 14px;
-  vertical-align: -2px;
-  color: var(--ok);
-}
-
-.code-digits {
-  font-size: 2rem;
-  letter-spacing: 0.12em;
-  font-variant-numeric: tabular-nums;
-}
-
-.link-hero .btn {
-  width: 100%;
 }
 
 /* --- empty / failed states --- */
@@ -2744,71 +2670,686 @@ select {
   height: 18px;
 }
 
-/* --- connected: quick actions; tab layouts (one column on phones) --- */
+/* --- tab layouts (one column on phones) --- */
 
 .home-grid,
 .home-col,
-.connected-grid,
 .files-layout,
-.files-compose {
+.files-compose,
+.hub {
   display: flex;
   flex-direction: column;
   gap: inherit;
 }
 
-.quick-actions {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 12px;
+kbd {
+  padding: 1px 7px;
+  border-radius: 7px;
+  background: var(--glass-strong);
+  color: var(--muted);
+  font: 700 0.75rem var(--font);
+  white-space: nowrap;
 }
 
-@media (min-width: 460px) {
-  .quick-actions {
-    grid-template-columns: 1fr 1fr;
-  }
+.btn.primary kbd {
+  background: color-mix(in srgb, var(--on-ink) 18%, transparent);
+  color: inherit;
 }
 
-.quick-action {
+/* Keyboard-only hints and actions; phones get the touch wording. */
+.desk-only {
+  display: none;
+}
+
+/* --- hub: the connected Devices tab --- */
+
+.hub-head {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 16px;
+}
+
+.hub-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  color: var(--ok);
+}
+
+.hub-state.off {
+  color: var(--error);
+}
+
+.hub-state .dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.hub-title {
+  font-size: 1.6rem;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.hub-link {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 22px 14px;
+}
+
+.hub-link.off {
+  border-color: color-mix(in srgb, var(--error) 40%, var(--glass-border));
+}
+
+.hub-end {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 30%;
+  min-width: 0;
+  text-align: center;
+}
+
+.hub-end strong {
+  overflow-wrap: anywhere;
+}
+
+.hub-orb {
+  --orb-base: 0 0 0 0 transparent;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--glass-strong);
+  color: var(--text);
+  box-shadow: var(--orb-base);
+}
+
+.hub-orb .icon {
+  width: 28px;
+  height: 28px;
+}
+
+.hub-orb.live {
+  animation: orb-pulse 2.4s ease-out infinite;
+  animation-delay: var(--delay, 0s);
+}
+
+@keyframes orb-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--choice) 45%, transparent), var(--orb-base);
+  }
+  100% {
+    box-shadow: 0 0 0 22px transparent, var(--orb-base);
+  }
+}
+
+.hub-beam {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding-top: 6px;
+  text-align: center;
+}
+
+.hub-chip {
+  display: inline-flex;
+  gap: 4px;
+  max-width: 100%;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--glass-strong);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.hub-chip.busy {
+  background: var(--sky);
+  color: var(--on-pastel);
+}
+
+.hub-chip .ellipsis {
+  max-width: 180px;
+}
+
+.hub-track {
+  position: relative;
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+}
+
+/* Light running from one device to the other; faster while a transfer runs. */
+.hub-track span {
+  position: absolute;
+  top: -3px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--choice);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--choice) 60%, transparent);
+  opacity: 0;
+  animation: hub-flow 2.4s linear infinite;
+}
+
+.hub-track span:nth-child(2) {
+  animation-delay: 0.8s;
+}
+
+.hub-track span:nth-child(3) {
+  animation-delay: 1.6s;
+}
+
+.hub-track.busy span {
+  animation-duration: 1.2s;
+}
+
+.hub-track.busy span:nth-child(2) {
+  animation-delay: 0.4s;
+}
+
+.hub-track.busy span:nth-child(3) {
+  animation-delay: 0.8s;
+}
+
+.hub-track.broken {
+  background: repeating-linear-gradient(90deg, color-mix(in srgb, var(--error) 55%, transparent) 0 8px, transparent 8px 14px);
+}
+
+.hub-track.broken span {
+  display: none;
+}
+
+@keyframes hub-flow {
+  0% {
+    left: 0;
+    opacity: 0;
+  }
+  12%,
+  88% {
+    opacity: 1;
+  }
+  100% {
+    left: calc(100% - 10px);
+    opacity: 0;
+  }
+}
+
+.hub-code .icon {
+  width: 14px;
+  height: 14px;
+  vertical-align: -2px;
+  color: var(--ok);
+}
+
+.hub-lost {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 20px;
+  text-align: center;
+}
+
+/* Phones: the "Dosya seç" tile does the same, and nothing is dropped on a phone. */
+.hub-drop {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .hub-drop {
+    display: flex;
+  }
+}
+
+.hub-drop {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 28px 16px;
+  border: 1.5px dashed color-mix(in srgb, var(--text) 22%, transparent);
+  border-radius: var(--radius);
+  background: var(--glass);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition:
+    border-color 0.25s,
+    background 0.25s,
+    box-shadow 0.25s;
+}
+
+.hub-drop:hover {
+  border-color: color-mix(in srgb, var(--choice) 70%, transparent);
+}
+
+.hub-drop strong {
+  font-size: 1.15rem;
+}
+
+.hub-drop-icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: var(--sky);
+  color: var(--on-pastel);
+  animation: float 3.5s ease-in-out infinite;
+}
+
+.hub-drop-icon .icon {
+  width: 28px;
+  height: 28px;
+}
+
+.hub-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.hub-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 16px;
   border-radius: 22px;
   color: inherit;
+  font: inherit;
   text-align: left;
   cursor: pointer;
   transition: transform 0.25s var(--spring);
 }
 
-.quick-action:hover {
-  transform: translateY(-2px);
+.hub-tile:hover {
+  transform: translateY(-3px);
 }
 
-.quick-action:active {
+.hub-tile:active {
   transform: scale(0.98);
 }
 
-.qa-chevron {
-  color: var(--muted);
-}
-
-.qa-clipboard .option-icon {
+.tile-clipboard .option-icon {
   background: var(--lemon);
 }
 
-.qa-screen .option-icon {
+.tile-screen .option-icon {
   background: var(--mint);
 }
 
-.qa-history .option-icon {
+.tile-eye .option-icon {
   background: var(--peach);
 }
 
-/* --- desktop: sidebar instead of the dock, wider layouts, centred dialogs --- */
+/* --- the hub's feed --- */
+
+.hub-grid,
+.hub-main {
+  display: flex;
+  flex-direction: column;
+  gap: inherit;
+}
+
+.activity {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+}
+
+.activity-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px;
+  font-size: 1.05rem;
+}
+
+.activity-head .segmented {
+  width: 200px;
+}
+
+.activity-head .segmented button {
+  min-height: 30px;
+  font-size: 0.8rem;
+}
+
+.activity-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  max-height: 420px;
+  padding: 2px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.activity-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--glass-border);
+  border-radius: 18px;
+  background: var(--glass);
+  animation: rise 0.35s var(--ease) both;
+}
+
+.activity-item.live {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.activity-item.pending {
+  border-color: color-mix(in srgb, var(--choice) 55%, transparent);
+}
+
+.activity-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+:is(.activity-main, .activity-item.live) .grow {
+  min-width: 0;
+}
+
+.activity-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: var(--sky);
+  color: var(--on-pastel);
+}
+
+.activity-icon.out {
+  background: var(--mint);
+}
+
+.activity-icon.text {
+  background: var(--lemon);
+}
+
+.activity-icon.screen {
+  background: var(--rose);
+}
+
+.activity-icon .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.activity-progress {
+  display: block;
+  margin-top: 6px;
+}
+
+.activity-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.activity-actions .btn {
+  flex: 1;
+}
+
+.activity-empty {
+  margin: 24px 0;
+}
+
+.activity-compose {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px 6px 14px;
+  border-radius: 999px;
+  background: var(--glass-strong);
+}
+
+.activity-compose input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  outline: none;
+}
+
+/* --- command palette (Ctrl+K) --- */
+
+.palette-backdrop {
+  position: fixed;
+  z-index: 45;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 12vh 16px 16px;
+  background: var(--veil);
+  animation: fade 0.2s ease both;
+}
+
+.palette {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(100%, 620px);
+  max-height: 72vh;
+  padding: 10px;
+  border-radius: 26px;
+  animation: palette-in 0.3s var(--spring) both;
+}
+
+@keyframes palette-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.97);
+  }
+}
+
+.palette-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 18px;
+  background: var(--glass-strong);
+  color: var(--muted);
+}
+
+.palette-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font: 600 1.05rem var(--font);
+  outline: none;
+}
+
+.palette-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px;
+  overflow-y: auto;
+}
+
+.palette-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 14px;
+  background: none;
+  color: inherit;
+  font: 600 0.95rem var(--font);
+  text-align: left;
+  cursor: pointer;
+}
+
+.palette-item.active {
+  background: var(--glass-strong);
+}
+
+.palette-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--sky);
+  color: var(--on-pastel);
+}
+
+.palette-icon.g-nav {
+  background: var(--glass-strong);
+  color: var(--text);
+}
+
+.palette-icon:is(.g-clipboard) {
+  background: var(--lemon);
+}
+
+.palette-icon:is(.g-screen, .g-eye) {
+  background: var(--mint);
+}
+
+.palette-icon:is(.g-close, .g-stop) {
+  background: var(--rose);
+}
+
+.palette-icon:is(.g-globe, .g-qr) {
+  background: var(--peach);
+}
+
+.palette-icon .icon {
+  width: 17px;
+  height: 17px;
+}
+
+.palette-empty {
+  padding: 18px;
+}
+
+/* --- drop anywhere, paste anywhere --- */
+
+.drop-overlay {
+  position: fixed;
+  z-index: 50;
+  inset: 0;
+  display: grid;
+  padding: 20px;
+  background: color-mix(in srgb, var(--bg) 84%, transparent);
+  pointer-events: none;
+  animation: fade 0.2s ease both;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.drop-overlay-frame {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  border: 3px dashed color-mix(in srgb, var(--choice) 70%, transparent);
+  border-radius: 36px;
+  text-align: center;
+}
+
+.drop-overlay.off .drop-overlay-frame {
+  border-color: color-mix(in srgb, var(--error) 60%, transparent);
+}
+
+.drop-overlay-icon {
+  display: grid;
+  place-items: center;
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  background: var(--sky);
+  color: var(--on-pastel);
+  animation: float 2s ease-in-out infinite;
+}
+
+.drop-overlay-icon .icon {
+  width: 48px;
+  height: 48px;
+}
+
+.drop-overlay strong {
+  font-size: clamp(1.4rem, 3vw, 2.2rem);
+  letter-spacing: -0.02em;
+}
+
+.paste-card {
+  position: fixed;
+  z-index: 26;
+  left: 50%;
+  bottom: calc(100px + env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(calc(100% - 32px), 540px);
+  padding: 10px 10px 10px 12px;
+  border-radius: 22px;
+  transform: translateX(-50%);
+  animation: rise 0.4s var(--spring) both;
+}
+
+.paste-body {
+  min-width: 0;
+}
+
+.toast.error span {
+  color: var(--error);
+}
+
+/* --- desktop: a slim rail instead of the dock, wider layouts, centred dialogs --- */
 
 @media (min-width: 1024px) {
   :root {
-    --sidebar: 252px;
+    /* The rail plus its margins. */
+    --sidebar: 108px;
   }
 
   .app {
@@ -2845,9 +3386,10 @@ select {
     left: 16px;
     display: flex;
     flex-direction: column;
-    gap: 22px;
-    width: calc(var(--sidebar) - 32px);
-    padding: 20px 12px 12px;
+    align-items: center;
+    gap: 14px;
+    width: 76px;
+    padding: 16px 0 12px;
     border-radius: 28px;
     transform: none;
     animation: dock-side-in 0.6s var(--spring) both;
@@ -2858,6 +3400,98 @@ select {
       opacity: 0;
       transform: translateX(-24px);
     }
+  }
+
+  /* The mark alone, in the theme's accent on a soft tile: no heavy black block. */
+  .dock-brand {
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    margin-bottom: 6px;
+    border-radius: 18px;
+    background: var(--glass-strong);
+  }
+
+  .dock-brand > span {
+    display: none;
+  }
+
+  .dock-brand .logo-tile {
+    fill: transparent;
+  }
+
+  .dock-brand .logo-pixels {
+    fill: var(--choice);
+  }
+
+  .dock-items {
+    grid-template-columns: 1fr;
+    grid-auto-rows: 64px;
+    width: 64px;
+  }
+
+  .dock-pill {
+    width: 100%;
+    height: 64px;
+    bottom: auto;
+    border-radius: 18px;
+    transform: translateY(calc(var(--index) * 100%));
+  }
+
+  .dock-item {
+    justify-content: center;
+    gap: 4px;
+    padding: 0;
+    border-radius: 18px;
+    font-size: 0.7rem;
+  }
+
+  .dock-item:hover:not(.active) {
+    color: var(--text);
+  }
+
+  .dock-command {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    width: 64px;
+    margin-top: auto;
+    padding: 10px 0 8px;
+    border: none;
+    border-radius: 18px;
+    background: var(--glass-strong);
+    color: var(--muted);
+    font-size: 0.62rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+
+  .dock-command:hover {
+    color: var(--text);
+  }
+
+  .dock-status {
+    display: flex;
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+  }
+
+  .dock-status .grow {
+    display: none;
+  }
+
+  .dock-status .avatar {
+    width: 46px;
+    height: 46px;
+  }
+
+  .desk-only {
+    display: inline;
   }
 
   .brand-mobile,
@@ -2885,66 +3519,68 @@ select {
     flex-wrap: nowrap;
   }
 
-  .dock-brand {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 0 8px;
-    line-height: 1.25;
+  .phone-only {
+    display: none;
   }
 
-  .dock-brand strong {
-    font-size: 1.2rem;
-    letter-spacing: -0.02em;
+  .hub-title {
+    font-size: 2rem;
   }
 
-  .dock-items {
-    grid-template-columns: 1fr;
-    grid-auto-rows: 48px;
+  .hub-link {
+    padding: 34px 40px;
   }
 
-  .dock-pill {
-    width: 100%;
-    height: 48px;
-    bottom: auto;
-    border-radius: 16px;
-    transform: translateY(calc(var(--index) * 100%));
+  .hub-orb {
+    width: 92px;
+    height: 92px;
   }
 
-  .dock-item {
-    flex-direction: row;
-    justify-content: flex-start;
-    gap: 12px;
-    padding: 0 14px;
-    border-radius: 16px;
-    font-size: 0.95rem;
+  .hub-orb .icon {
+    width: 40px;
+    height: 40px;
   }
 
-  .dock-item:hover:not(.active) {
-    color: var(--text);
+  .hub-drop {
+    min-height: 230px;
   }
 
-  .dock-status {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-top: auto;
-    padding: 10px;
-    border: none;
-    border-radius: 18px;
-    background: var(--glass-strong);
-    color: inherit;
-    text-align: left;
-    cursor: pointer;
+  .hub-drop strong {
+    font-size: 1.45rem;
   }
 
-  .dock-status .grow {
-    min-width: 0;
+  .hub-drop-icon {
+    width: 72px;
+    height: 72px;
   }
 
-  .dock-status .avatar {
-    width: 38px;
-    height: 38px;
+  .hub-drop-icon .icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .hub-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+    align-items: start;
+    gap: 24px;
+  }
+
+  /* The feed stays in view beside the hub, as tall as the window allows. */
+  .hub .activity {
+    position: sticky;
+    top: 24px;
+    height: calc(100dvh - 180px);
+    min-height: 420px;
+  }
+
+  .hub .activity-list {
+    max-height: none;
+  }
+
+  .paste-card {
+    bottom: 28px;
+    left: calc(50% + var(--sidebar) / 2);
   }
 
   .home-grid {
@@ -2952,17 +3588,6 @@ select {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     align-items: start;
     gap: 24px;
-  }
-
-  .connected-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-    align-items: start;
-    gap: 24px;
-  }
-
-  .quick-actions {
-    grid-template-columns: 1fr;
   }
 
   .files-layout {
@@ -3124,6 +3749,170 @@ select {
     right: 16px;
     bottom: 92px;
     width: 300px;
+  }
+}
+
+/*
+ * Desktop: each screen is exactly the window's height and scrolls inside
+ * itself, so the main areas (radar, drop zone, lists, feed) can fill the
+ * window instead of leaving empty space below and beside them.
+ */
+@media (min-width: 1024px) {
+  .screen {
+    max-width: none;
+    height: 100dvh;
+    padding: 28px max(32px, calc((100% - 580px) / 2));
+    overflow-y: auto;
+  }
+
+  .screen.wide {
+    max-width: none;
+    padding: 24px 32px;
+  }
+
+  /* Reading width for the chat, but its scrollbar stays at the window's edge. */
+  .screen.wide.tab-clipboard {
+    max-width: none;
+    padding-inline: max(32px, calc((100% - 960px) / 2));
+  }
+
+  .screen.wide.tab-history {
+    max-width: none;
+  }
+
+  .screen.meeting {
+    padding: 20px 24px;
+    overflow: hidden;
+  }
+
+  /*
+   * Home: the radar is the stage, across the whole width; the other ways to
+   * connect sit below it as slim one-line cards (icon, text, buttons).
+   */
+  .home-grid {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .home-col:first-child {
+    flex: 1;
+    min-height: 0;
+  }
+
+  /* The card is a size container, so the radar can be as big as the card leaves room for. */
+  .home-col .radar-card {
+    height: 100%;
+    justify-content: center;
+    container-type: size;
+  }
+
+  /* Square; room is left for the heading and the two caption lines. */
+  .home-col .radar {
+    --size: min(560px, calc(100cqh - 150px), 90cqw);
+    flex-shrink: 0;
+  }
+
+  /* Two cards side by side; with the QR card shown, the wide one takes its own row. */
+  .home-col .options {
+    grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
+  }
+
+  .home-col .option {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 16px;
+    row-gap: 2px;
+    padding: 16px 18px 16px 20px;
+  }
+
+  .home-col .option .option-icon {
+    grid-row: 1 / 3;
+  }
+
+  .home-col .option h2 {
+    grid-column: 2;
+    align-self: end;
+    margin: 0;
+  }
+
+  .home-col .option p {
+    grid-column: 2;
+    align-self: start;
+  }
+
+  .home-col .options .option.wide .actions,
+  .home-col .options .option .actions {
+    grid-column: 3;
+    grid-row: 1 / 3;
+    flex-direction: row;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Hub: the drop zone takes the height left over; the feed runs the full height beside it. */
+  .hub {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .hub-grid {
+    flex: 1;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
+    grid-template-rows: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .hub-main {
+    min-height: 0;
+  }
+
+  .hub-drop {
+    flex: 1 1 auto;
+    min-height: 150px;
+  }
+
+  .hub .activity {
+    position: static;
+    height: auto;
+    min-height: 0;
+  }
+
+  /* Files: a tall drop zone on the left; the transfers scroll on the right. */
+  .files-layout {
+    flex: 1;
+    min-height: 0;
+    grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .files-compose {
+    position: static;
+    min-height: 0;
+  }
+
+  .files-compose .dropzone {
+    flex: 1;
+    justify-content: center;
+    min-height: 200px;
+  }
+
+  /* Room for the raised shadows inside the scrolling list. */
+  .files-list {
+    min-height: 0;
+    margin: -12px;
+    padding: 12px;
+    overflow-y: auto;
+  }
+
+  .files-list > .empty-list {
+    flex: 1;
+    justify-content: center;
   }
 }
 
@@ -3338,7 +4127,7 @@ select {
 }
 
 /* Each pastel card casts a shadow in a deeper shade of its own colour (light mode; dark mode keeps plain shadows). */
-:root[data-theme='pastel']:where([data-scheme='light']) :is(.option, .radar-card, .peer-bar, .link-hero, .dropzone, .pending, .empty) {
+:root[data-theme='pastel']:where([data-scheme='light']) :is(.option, .radar-card, .peer-bar, .hub-link, .dropzone, .pending, .empty) {
   box-shadow:
     0 1px 2px rgb(37 48 71 / 5%),
     0 10px 22px -10px var(--tint-shadow),
@@ -3355,7 +4144,7 @@ select {
   --tint-shadow: rgb(60 170 115 / 34%);
 }
 
-:root[data-theme='pastel']:where([data-scheme='light']) :is(.radar-card, .link-hero) {
+:root[data-theme='pastel']:where([data-scheme='light']) :is(.radar-card, .hub-link) {
   --tint-shadow: rgb(70 130 220 / 34%);
 }
 
@@ -3363,12 +4152,12 @@ select {
   --tint-shadow: rgb(215 170 40 / 34%);
 }
 
-:root[data-theme='pastel']:where([data-scheme='light']) :is(.peer-bar, .link-hero).off {
+:root[data-theme='pastel']:where([data-scheme='light']) :is(.peer-bar, .hub-link).off {
   --tint-shadow: rgb(225 95 120 / 34%);
 }
 
 /* Pastel-filled cards: dark text and translucent white fills inside, in light and dark mode alike. */
-:root[data-theme='pastel'] :is(.option, .radar-card, .peer-bar, .link-hero, .dropzone, .pending, .empty) {
+:root[data-theme='pastel'] :is(.option, .radar-card, .peer-bar, .hub-link, .dropzone, .pending, .empty) {
   --text: var(--on-pastel);
   --muted: rgb(37 48 71 / 62%);
   --glass-strong: rgb(255 255 255 / 62%);
@@ -3398,7 +4187,7 @@ select {
 }
 
 :root[data-theme='pastel'] .radar-card,
-:root[data-theme='pastel'] .link-hero {
+:root[data-theme='pastel'] .hub-link {
   background: var(--sky);
 }
 
@@ -3407,7 +4196,7 @@ select {
 }
 
 :root[data-theme='pastel'] .peer-bar.off,
-:root[data-theme='pastel'] .link-hero.off {
+:root[data-theme='pastel'] .hub-link.off {
   background: var(--rose);
 }
 
@@ -3768,12 +4557,46 @@ select {
   box-shadow: var(--raise-sm);
 }
 
-:root[data-theme='soft'] :is(.peer-bar, .link-hero).off {
+:root[data-theme='soft'] :is(.peer-bar, .hub-link).off {
   box-shadow: var(--raise), inset 0 0 0 2px color-mix(in srgb, var(--error) 35%, transparent);
 }
 
 :root[data-theme='soft'] .qr {
   box-shadow: var(--raise-sm);
+}
+
+/* The hub, palette, activity panel and rail, shaped like the rest of Soft. */
+:root[data-theme='soft'] :is(.hub-orb, .hub-drop-icon) {
+  --orb-base: var(--raise-sm);
+  background: var(--surface);
+  color: var(--blue-text);
+}
+
+:root[data-theme='soft'] .hub-drop {
+  border: none;
+  background: var(--well);
+  box-shadow: var(--inset);
+}
+
+:root[data-theme='soft'] .hub-drop:hover {
+  background: var(--surface);
+  box-shadow: var(--raise);
+}
+
+:root[data-theme='soft'] :is(.palette-search, .activity-compose, .dock-command, .hub-chip:not(.busy), .palette-item.active) {
+  background: var(--well);
+  box-shadow: var(--inset);
+}
+
+:root[data-theme='soft'] .activity-item {
+  border-color: transparent;
+  background: var(--bg);
+  box-shadow: var(--raise-sm);
+}
+
+:root[data-theme='soft'] kbd {
+  background: var(--bg);
+  box-shadow: 2px 2px 4px var(--dark), -2px -2px 4px var(--light);
 }
 
 /* Screen sharing and the desktop sidebar, shaped like the rest of Soft. */
@@ -3793,7 +4616,12 @@ select {
   box-shadow: var(--raise-sm);
 }
 
-:root[data-theme='soft'] :is(.dock-status, .meet-person) {
+:root[data-theme='soft'] .dock-brand {
+  background: var(--surface);
+  box-shadow: var(--raise-sm);
+}
+
+:root[data-theme='soft'] .meet-person {
   background: var(--well);
   box-shadow: var(--inset);
 }
@@ -3802,7 +4630,7 @@ select {
   background: var(--bg);
 }
 
-:root[data-theme='soft'] :is(.feature-icon, .quick-action .option-icon) {
+:root[data-theme='soft'] :is(.feature-icon, .hub-tile .option-icon, .activity-icon, .palette-icon, .hub-drop-icon) {
   color: var(--blue-text);
 }
 

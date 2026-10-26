@@ -18,7 +18,7 @@ describe('ipv6Prefix', () => {
 
 describe('device identity', () => {
   it('makes two-word Turkish names', () => {
-    expect(randomDeviceName()).toMatch(/^\S+ \S+$/u);
+    expect(randomDeviceName()).toMatch(/^[A-Z][a-z]+ \d{2}$/);
   });
 
   it('classifies common user agents', () => {

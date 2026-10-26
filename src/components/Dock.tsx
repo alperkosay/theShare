@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import { useSession } from '../hooks/useSession';
 import { useScreenShare } from '../hooks/useScreenShare';
+import { palette } from '../hooks/usePalette';
 import { deviceLabel } from '../lib/device';
 import { DeviceIcon, Icon, type IconName } from './Icon';
 import { Logo } from './Logo';
@@ -24,15 +25,15 @@ interface Props {
 
 /**
  * Phones: a floating glass tab bar; the glowing pill slides under the active tab.
- * Desktop (CSS, ≥ 1024px): the same nav becomes a sidebar with the brand on
- * top and the connection at the bottom.
+ * Desktop (CSS, ≥ 1024px): the same nav becomes a slim rail with the logo on
+ * top, and the command palette and the connection at the bottom.
  */
 export function Dock({ tab, onChange, badges }: Props) {
   const index = TABS.findIndex((t) => t.id === tab);
   return (
     <nav className="dock" aria-label="Bölümler" style={{ '--items': TABS.length, '--index': index } as CSSProperties}>
       <div className="dock-brand" aria-hidden="true">
-        <Logo size={36} />
+        <Logo size={40} />
         <span>
           <strong className="block">theShare</strong>
           <span className="small muted">Cihazdan cihaza</span>
@@ -69,6 +70,10 @@ export function Dock({ tab, onChange, badges }: Props) {
           );
         })}
       </div>
+      <button type="button" className="dock-command" onClick={palette.open} aria-label="Komut paleti (Ctrl K)" title="Komut paleti (Ctrl K)">
+        <Icon name="search" />
+        <span className="dock-label">Ctrl K</span>
+      </button>
       <DockStatus onOpen={() => onChange('devices')} />
     </nav>
   );
@@ -88,7 +93,7 @@ function DockStatus({ onOpen }: { onOpen: () => void }) {
   else detail = peer ? `${deviceLabel(peer)} · bağlı` : 'Bağlı';
 
   return (
-    <button type="button" className="dock-status" onClick={onOpen}>
+    <button type="button" className="dock-status" onClick={onOpen} title={`${wasConnected ? (peerName ?? 'Bağlı cihaz') : 'Cihaz bağlayın'} · ${detail}`}>
       <span className="avatar">
         {wasConnected ? <DeviceIcon kind={peer?.kind ?? 'computer'} /> : <Icon name="radar" />}
         <span className={`dot ${connected ? 'on' : 'off'}`} aria-hidden="true" />

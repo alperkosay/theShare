@@ -14,6 +14,8 @@ import { ScreenTab } from './screens/ScreenTab';
 import { useScreenShare } from './hooks/useScreenShare';
 import { ScreenAskPrompt, ScreenMini } from './components/ScreenShare';
 import { PopOutHost } from './components/PopOut';
+import { CommandPalette } from './components/CommandPalette';
+import { GlobalDrop, Toasts } from './components/GlobalDrop';
 import { usePopout } from './hooks/usePopout';
 import { Dock, type Tab } from './components/Dock';
 import { RequestSheet } from './components/Radar';
@@ -72,8 +74,8 @@ export function App() {
   // Unread badges for the tabs you're not looking at.
   const incomingTexts = state.messages.filter((m) => m.direction === 'in').length;
   const [seenTexts, setSeenTexts] = useState(0);
-  // The meeting's chat shows the same messages, so they count as seen there too.
-  const textsVisible = tab === 'clipboard' || (tab === 'screen' && streaming);
+  // The meeting's chat and the hub's feed show the same messages, so they count as seen there too.
+  const textsVisible = tab === 'clipboard' || (tab === 'screen' && streaming) || (tab === 'devices' && state.wasConnected);
   useEffect(() => {
     if (textsVisible || incomingTexts === 0) setSeenTexts(incomingTexts);
   }, [textsVisible, incomingTexts]);
@@ -107,6 +109,9 @@ export function App() {
       {tab !== 'screen' && !popoutOpen && <ScreenMini onOpen={() => setTab('screen')} />}
       <PopOutHost />
       <ScreenAskPrompt onShare={() => setTab('screen')} />
+      <GlobalDrop />
+      <CommandPalette onOpen={setTab} />
+      <Toasts />
       <RequestSheet />
       <UpdatePrompt busy={transferring} />
       <InstallPrompt home={tab === 'devices' && !air && state.role === null && !state.wasConnected} />

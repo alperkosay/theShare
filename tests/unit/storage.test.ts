@@ -73,6 +73,12 @@ describe('stored profile', () => {
     expect(normalizeProfile({ settings: { scheme: 'sepia' } as never }).settings.scheme).toBe('system');
   });
 
+  it('replaces an old playful default name, but keeps names the user chose', () => {
+    expect(normalizeProfile({ name: 'Mavi Tilki' }).name).toMatch(/^[A-Z][a-z]+ \d{2}$/);
+    expect(normalizeProfile({ name: 'Mavi Tilki Ofis' }).name).toBe('Mavi Tilki Ofis');
+    expect(normalizeProfile({ name: 'Alper' }).name).toBe('Alper');
+  });
+
   it('creates a fresh identity when nothing is stored', () => {
     const a = normalizeProfile(undefined);
     const b = normalizeProfile(undefined);

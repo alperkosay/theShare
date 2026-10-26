@@ -12,8 +12,17 @@ export interface DeviceInfo {
 const KINDS: readonly DeviceKind[] = ['phone', 'tablet', 'computer'];
 const OSES: readonly DeviceOs[] = ['ios', 'android', 'windows', 'macos', 'linux', 'other'];
 
-const ADJECTIVES = ['Mavi', 'Kırmızı', 'Yeşil', 'Mor', 'Turuncu', 'Sarı', 'Pembe', 'Turkuaz', 'Gri', 'Lacivert', 'Altın', 'Gümüş'];
-const ANIMALS = ['Tilki', 'Kaplan', 'Baykuş', 'Yunus', 'Kartal', 'Panda', 'Kedi', 'Ceylan', 'Kunduz', 'Penguen', 'Sincap', 'Martı'];
+/** Default names: a star plus a number ("Vega 27"). Neutral, short, and easy to tell apart on a list. */
+const STARS = ['Vega', 'Altair', 'Orion', 'Lyra', 'Sirius', 'Rigel', 'Deneb', 'Atlas', 'Polaris', 'Nova', 'Capella', 'Antares'];
+
+/** The playful names earlier versions generated ("Mavi Tilki"); replaced by a new default on load. */
+const LEGACY_ADJECTIVES = ['Mavi', 'Kırmızı', 'Yeşil', 'Mor', 'Turuncu', 'Sarı', 'Pembe', 'Turkuaz', 'Gri', 'Lacivert', 'Altın', 'Gümüş'];
+const LEGACY_ANIMALS = ['Tilki', 'Kaplan', 'Baykuş', 'Yunus', 'Kartal', 'Panda', 'Kedi', 'Ceylan', 'Kunduz', 'Penguen', 'Sincap', 'Martı'];
+
+export function isLegacyGeneratedName(name: string): boolean {
+  const [adjective, animal, ...rest] = name.split(' ');
+  return rest.length === 0 && LEGACY_ADJECTIVES.includes(adjective ?? '') && LEGACY_ANIMALS.includes(animal ?? '');
+}
 
 const KIND_LABEL: Record<DeviceKind, string> = { phone: 'telefon', tablet: 'tablet', computer: 'bilgisayar' };
 
@@ -37,7 +46,8 @@ export function deviceLabel({ kind, os }: Pick<DeviceInfo, 'kind' | 'os'>): stri
 
 export function randomDeviceName(): string {
   const pick = <T,>(list: T[]) => list[crypto.getRandomValues(new Uint32Array(1))[0]! % list.length]!;
-  return `${pick(ADJECTIVES)} ${pick(ANIMALS)}`;
+  const number = 10 + (crypto.getRandomValues(new Uint32Array(1))[0]! % 90);
+  return `${pick(STARS)} ${number}`;
 }
 
 /** iPadOS reports itself as a Mac; touch support gives it away. */

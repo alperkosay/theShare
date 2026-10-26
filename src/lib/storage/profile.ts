@@ -1,4 +1,4 @@
-import { randomDeviceName } from '../device';
+import { isLegacyGeneratedName, randomDeviceName } from '../device';
 import { SAVE_MODES, type SaveMode } from '../transfer/save';
 import { SCREEN_QUALITIES, type ScreenQuality } from '../webrtc/media';
 
@@ -83,7 +83,8 @@ export function validateName(raw: string): { name: string } | { error: string } 
 export function normalizeProfile(stored: Partial<Profile> | undefined): Profile {
   const fresh = newProfile();
   if (!stored) return fresh;
-  const valid = typeof stored.name === 'string' && 'name' in validateName(stored.name);
+  // A name the user never changed from an old default gets the new kind of default.
+  const valid = typeof stored.name === 'string' && 'name' in validateName(stored.name) && !isLegacyGeneratedName(stored.name);
   const settings = { ...DEFAULT_SETTINGS, ...stored.settings };
   if (!THEMES.includes(settings.theme)) settings.theme = DEFAULT_SETTINGS.theme;
   if (!SCHEMES.includes(settings.scheme)) settings.scheme = DEFAULT_SETTINGS.scheme;
