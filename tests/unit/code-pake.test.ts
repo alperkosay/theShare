@@ -3,12 +3,20 @@ import { codeRoom, hostWithCode, joinWithCode, MAX_FAILED, type HostHandlers, ty
 
 /**
  * An in-memory WebTorrent tracker: offers go to a random other member of the
- * swarm, answers to `to_peer_id`. Every message passing through is recorded,
- * as a tracker operator could.
+ * swarm, answers to `to_peer_id`, and a closed socket leaves its swarms (as
+ * on a real tracker; otherwise offers would keep going to joiners that are
+ * long gone). Every message passing through is recorded, as a tracker
+ * operator could.
  */
 class FakeTracker {
   swarms = new Map<string, Map<string, FakeSocket>>();
   log: string[] = [];
+
+  leave(socket: FakeSocket): void {
+    for (const swarm of this.swarms.values()) {
+      for (const [id, s] of swarm) if (s === socket) swarm.delete(id);
+    }
+  }
 
   handle(from: FakeSocket, text: string): void {
     this.log.push(text);
@@ -18,8 +26,9 @@ class FakeTracker {
     swarm.set(msg.peer_id, from);
     const deliver = (to: FakeSocket | undefined, body: object) => to && queueMicrotask(() => to.receive(JSON.stringify({ action: 'announce', info_hash: msg.info_hash, peer_id: msg.peer_id, ...body })));
     if (msg.answer) return deliver(swarm.get(msg.to_peer_id), { answer: msg.answer, offer_id: msg.offer_id });
-    const others = [...swarm].filter(([id]) => id !== msg.peer_id).map(([, s]) => s);
-    for (const o of msg.offers ?? []) deliver(others[Math.floor(Math.random() * others.length)], { offer: o.offer, offer_id: o.offer_id });
+    // Like bittorrent-tracker: each offer goes to a different random member.
+    const others = [...swarm].filter(([id]) => id !== msg.peer_id).map(([, s]) => s).sort(() => Math.random() - 0.5);
+    (msg.offers ?? []).forEach((o: { offer: unknown; offer_id: string }, i: number) => deliver(others[i], { offer: o.offer, offer_id: o.offer_id }));
   }
 }
 
@@ -48,6 +57,7 @@ class FakeSocket {
   }
   close() {
     this.readyState = 3;
+    tracker.leave(this);
   }
 }
 
@@ -116,7 +126,8 @@ describe('6-digit code pairing (PAKE over trackers)', () => {
     await expect(joinWithCode('482913', 'TS1.offer', me)).rejects.toThrow('kabul etmedi');
   });
 
-  it('a wrong code (same room) is refused, counted, and the room closes after too many', async () => {
+  // Each refusal waits out the grace period in which the joiner keeps looking for a host with its code.
+  it('a wrong code (same room) is refused, counted, and the room closes after too many', { timeout: 20_000 }, async () => {
     const events = host('482913');
     await settle();
     for (let i = 1; i < MAX_FAILED; i++) {
@@ -126,6 +137,16 @@ describe('6-digit code pairing (PAKE over trackers)', () => {
     await expect(joinWithCode('411111', 'TS1.offer', me)).rejects.toThrow('çok kez yanlış');
     expect(events.at(-1)).toBe('locked');
     expect(events.some((e) => e.startsWith('offer') || e.startsWith('request'))).toBe(false);
+  });
+
+  it('a stranger answering first is not taken as "wrong code": the joiner keeps looking for its host', { timeout: 10_000 }, async () => {
+    host('499999');
+    await settle();
+    const joined = joinWithCode('482913', 'TS1.offer', me);
+    await new Promise((r) => setTimeout(r, 500)); // the stranger has said no by now
+    const mine = host('482913');
+    await expect(joined).resolves.toBe('answer to TS1.offer');
+    expect(mine).toContain('offer TS1.offer');
   });
 
   it('two hosts in the same room: the joiner reaches the one with its code', async () => {

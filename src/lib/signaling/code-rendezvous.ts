@@ -53,6 +53,11 @@ const OFFER_COPIES = 5;
 const MAX_RUNS = 8;
 /** Hosts a joiner sends its proof to (each could be an attacker making one guess). */
 const MAX_HOSTS = 3;
+/**
+ * Every host that answered so far had another code: rooms are shared, and ours
+ * may not have seen us yet. Keep looking this long before saying "wrong code".
+ */
+const WRONG_CODE_GRACE_MS = 4_000;
 
 const MSG_UNREACHABLE =
   'Eşleştirme sunucularına ulaşılamadı. İnternet bağlantınızı kontrol edin ya da QR ile bağlanın.';
@@ -271,10 +276,15 @@ export async function joinWithCode(code: string, offer: string, me: Requester, {
     };
     const announce = (socket: WebSocket) =>
       pool.send(socket, { action: 'announce', info_hash: infoHash, peer_id: peerId, numwant: OFFER_COPIES, uploaded: 0, downloaded: 0, event: 'started', offers });
-    const failHost = (host: { state: string }, message: string) => {
+    /** `final`: the host knew our code and said no; any other failure may just be someone else's room. */
+    const failHost = (host: { state: string }, message: string, final = false) => {
       host.state = 'failed';
       lastFailure = message;
-      if ([...hosts.values()].every((h) => h.state === 'failed') && hosts.size >= 1) finish(() => reject(new SignalError(message)));
+      if (![...hosts.values()].every((h) => h.state === 'failed')) return;
+      if (final) return finish(() => reject(new SignalError(message)));
+      clearTimeout(timeout);
+      timeout = setTimeout(() => finish(() => reject(new SignalError(lastFailure))), WRONG_CODE_GRACE_MS);
+      pool.each(announce);
     };
 
     const onMessage = async (msg: TrackerMessage, socket: WebSocket) => {
@@ -301,8 +311,8 @@ export async function joinWithCode(code: string, offer: string, me: Requester, {
       const host = hosts.get(from);
       if (body.t !== 'result' || host?.state !== 'sent' || !host.keys) return;
       if (!body.ok) {
-        const message = body.reason === 'declined' ? MSG_DECLINED : body.reason === 'locked' ? MSG_LOCKED : body.reason === 'busy' ? MSG_BUSY : MSG_WRONG;
-        return failHost(host, message);
+        if (body.reason === 'declined' || body.reason === 'busy') return failHost(host, body.reason === 'declined' ? MSG_DECLINED : MSG_BUSY, true);
+        return failHost(host, body.reason === 'locked' ? MSG_LOCKED : MSG_WRONG);
       }
       // Anyone can claim "ok"; only the real host can confirm the key and seal the answer.
       const answer = (await host.keys.check(body.tag)) ? await unseal(host.keys.key, body.box) : null;
