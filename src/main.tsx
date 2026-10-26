@@ -4,6 +4,9 @@ import { App } from './App';
 import { cleanupTemporaryFiles } from './lib/transfer/sinks';
 import { profile } from './hooks/useProfile';
 import { history } from './hooks/useHistory';
+import { saving } from './hooks/useSaving';
+// Imported early: Chromium may fire its install event before the first render.
+import './hooks/useInstall';
 import './styles.css';
 
 // Remove temporary received files left behind by a tab that was closed mid-session.
@@ -13,6 +16,7 @@ void cleanupTemporaryFiles();
 // it gives up quickly if storage is broken. The history can fill in after the first render.
 void profile.load().then(() => {
   void history.load();
+  void saving.load();
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <App />

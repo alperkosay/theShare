@@ -14,6 +14,7 @@ import {
   canSaveToDisk,
   cleanupTemporaryFiles,
   createBrowserSinkFactory,
+  directorySinkFactory,
   pickDiskTarget,
   type FileSink,
   type SinkFactory,
@@ -137,11 +138,14 @@ export class TransferManager {
   onPeerInfo: (peer: PeerInfo) => void = () => {};
   onText: (message: TextMessage) => void = () => {};
   onRecord: (record: TransferRecord) => void = () => {};
+  /** The save folder picked in the settings, if incoming files should go straight there. */
+  saveFolder: () => FileSystemDirectoryHandle | null = () => null;
+  /** Accept new offers without asking (the user turned it on for this connection). */
+  autoAccept = false;
 
   private transfers: Transfer[] = [];
   private dirty = false;
   private wakers: Array<() => void> = [];
-  private objectUrls: string[] = [];
   private readonly ticker: ReturnType<typeof setInterval>;
   private readonly onBufferLow = () => this.wake();
 
@@ -190,25 +194,25 @@ export class TransferManager {
   }
 
   /**
-   * Accepts an incoming offer. Large transfers on browsers that support it go
-   * straight to a file the user picks (nothing piles up in memory), so this
-   * must be called directly from a click handler for the picker to open.
+   * Accepts an incoming offer. With a save folder set, files are written
+   * straight into it; otherwise large transfers on browsers that support it go
+   * to a file the user picks (nothing piles up in memory). Either may need a
+   * prompt, so this must be called directly from a click handler.
    * Resolves to false if the user dismissed the picker (offer stays pending).
    */
   async accept(id: string): Promise<boolean> {
     const t = this.find(id, 'in');
     if (!t || t.status !== 'pending') return false;
-    let factory: SinkFactory;
-    if (canSaveToDisk() && t.totalBytes > SAVE_TO_DISK_ABOVE) {
+    const folder = this.saveFolder();
+    let factory = folder ? await folderSinkFactory(folder) : null;
+    if (!factory && canSaveToDisk() && t.totalBytes > SAVE_TO_DISK_ABOVE) {
       try {
         factory = await pickDiskTarget(t.files);
       } catch (e) {
         if ((e as DOMException).name === 'AbortError') return false;
-        factory = await createBrowserSinkFactory(t.id, t.totalBytes);
       }
-    } else {
-      factory = await createBrowserSinkFactory(t.id, t.totalBytes);
     }
+    factory ??= await createBrowserSinkFactory(t.id, t.totalBytes);
     if (t.status !== 'pending') return false; // cancelled while the picker was open
     t.factory = factory;
     t.sinkKind = factory.kind;
@@ -232,21 +236,14 @@ export class TransferManager {
     this.finish(t, 'cancelled', 'Aktarım iptal edildi.');
   }
 
-  /** Triggers a download of a received file (always a user-initiated action). */
-  download(id: string, index: number): void {
+  /** Marks received files as saved by the user (lib/transfer/save), so the card and the leave warning know. */
+  markSaved(id: string, indices: number[]): void {
     const t = this.find(id, 'in');
-    const r = t?.received[index];
-    if (!t || !r?.file) return;
-    const url = URL.createObjectURL(r.file);
-    this.objectUrls.push(url);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = r.name;
-    a.rel = 'noopener';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    r.downloaded = true;
+    if (!t) return;
+    for (const i of indices) {
+      const r = t.received[i];
+      if (r) r.downloaded = true;
+    }
     this.markDirty(true);
   }
 
@@ -273,15 +270,13 @@ export class TransferManager {
     }
   }
 
-  /** Ends the session: aborts everything and frees memory, object URLs and temporary files. */
+  /** Ends the session: aborts everything and frees memory and temporary files. */
   dispose(): void {
     clearInterval(this.ticker);
     this.link.channel.removeEventListener('bufferedamountlow', this.onBufferLow);
     for (const t of this.transfers) {
       if (isOpen(t.status)) this.finish(t, 'cancelled', null);
     }
-    for (const url of this.objectUrls) URL.revokeObjectURL(url);
-    this.objectUrls = [];
     this.transfers = [];
     this.wake();
     void cleanupTemporaryFiles();
@@ -389,6 +384,7 @@ export class TransferManager {
     }
     this.transfers.unshift(t);
     this.markDirty(true);
+    if (this.autoAccept) void this.accept(id);
   }
 
   private activeIncoming(id?: string): Incoming | undefined {
@@ -629,6 +625,19 @@ export class TransferManager {
       this.dirty = true;
     }
     this.flush();
+  }
+}
+
+/**
+ * The save folder from the settings, once its permission is confirmed. Must be
+ * the first await of the accept click: a stored handle asks again once per visit.
+ * Null without a user gesture (auto-accept) or if access was refused.
+ */
+async function folderSinkFactory(folder: FileSystemDirectoryHandle): Promise<SinkFactory | null> {
+  try {
+    return (await folder.requestPermission?.({ mode: 'readwrite' })) === 'granted' ? directorySinkFactory(folder) : null;
+  } catch {
+    return null;
   }
 }
 

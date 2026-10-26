@@ -1,6 +1,8 @@
 import type { CSSProperties } from 'react';
 import { session, useSession } from '../hooks/useSession';
+import { rooms, useRooms } from '../hooks/useRooms';
 import { deviceLabel, selfDevice } from '../lib/device';
+import { formatCode } from '../lib/signaling/code-rendezvous';
 import { Radar } from '../components/Radar';
 import { DeviceIcon, Icon } from '../components/Icon';
 import { ProfileChip } from '../components/Profile';
@@ -34,7 +36,7 @@ export function DevicesTab({ invite, air, onAir }: Props) {
   if (state.method === 'nearby' && state.role) return <NearbyConnectScreen />;
   if (state.role === 'host') return state.method === 'code' ? <CodeHostScreen /> : <HostScreen />;
   if (state.role === 'join') {
-    return state.method === 'code' ? <CodeJoinScreen initialCode={invite.code} /> : <JoinScreen initialOffer={invite.offer} />;
+    return state.method === 'code' ? <CodeJoinScreen initialCode={invite.code ?? state.pairCode} /> : <JoinScreen initialOffer={invite.offer} />;
   }
   return <HomeView onAir={onAir} />;
 }
@@ -54,6 +56,8 @@ function HomeView({ onAir }: { onAir: (mode: AirMode) => void }) {
       <div className="rise" style={{ '--i': 1 } as CSSProperties}>
         <Radar />
       </div>
+
+      <RecentRooms />
 
       <div className="options">
         <section className="glass option rise" style={{ '--i': 2 } as CSSProperties}>
@@ -108,15 +112,57 @@ function HomeView({ onAir }: { onAir: (mode: AirMode) => void }) {
   );
 }
 
+function minutesAgo(at: number): string {
+  const minutes = Math.floor((Date.now() - at) / 60_000);
+  if (minutes < 1) return 'az önce';
+  if (minutes < 60) return `${minutes} dk önce`;
+  return `${Math.floor(minutes / 60)} sa önce`;
+}
+
+/** Code rooms from the last 24 hours: reopen yours so a link you shared works again, or rejoin theirs. */
+function RecentRooms() {
+  const list = useRooms();
+  if (!list.length) return null;
+  return (
+    <section className="glass pending rise" aria-label="Son odalar" data-testid="recent-rooms">
+      <h2 className="eyebrow">Son odalar</h2>
+      <ul className="files">
+        {list.map((r) => (
+          <li key={r.code}>
+            <span className="grow">
+              <strong className="room-code">{formatCode(r.code)}</strong>
+              <span className="small muted block">
+                {r.role === 'host' ? 'Oluşturduğun oda' : 'Katıldığın oda'} · {minutesAgo(r.at)}
+              </span>
+            </span>
+            <button type="button" className="btn small primary" onClick={() => session.rejoinRoom(r.code, r.role)} data-testid="rejoin-room">
+              {r.role === 'host' ? 'Odayı aç' : 'Tekrar gir'}
+            </button>
+            <button type="button" className="link" onClick={() => rooms.forget(r.code)} aria-label={`${formatCode(r.code)} odasını listeden kaldır`}>
+              <Icon name="close" />
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function ConnectedView() {
-  const { linkState, peerName, peer, pairingCode, error, transfers } = useSession();
+  const { linkState, peerName, peer, pairingCode, error, transfers, method, role, pairCode } = useSession();
   const self = selfDevice();
   const connected = linkState === 'connected';
+  const room = method === 'code' && role && pairCode ? { code: pairCode, role } : null;
 
-  const leave = () => {
+  const confirmUnsaved = () => {
     const unsaved = transfers.some((t) => t.received.some((r) => r.file && !r.downloaded));
-    if (unsaved && !confirm('Kaydedilmemiş dosyalar silinecek. Çıkılsın mı?')) return;
-    session.leave();
+    return !unsaved || confirm('Kaydedilmemiş dosyalar silinecek. Devam edilsin mi?');
+  };
+  const leave = () => {
+    if (confirmUnsaved()) session.leave();
+  };
+  const rejoin = () => {
+    if (room && confirmUnsaved()) session.rejoinRoom(room.code, room.role);
   };
 
   return (
@@ -153,6 +199,22 @@ function ConnectedView() {
       )}
       {!connected && error && <p className="notice error">{error}</p>}
 
+      {room && (
+        <p className="small muted">
+          Oda <strong className="text">{formatCode(room.code)}</strong>
+          {connected ? ' · bağlantı koparsa aynı kodla geri dönebilirsiniz' : ''}
+        </p>
+      )}
+      {!connected && room && (
+        <>
+          <button type="button" className="btn primary" onClick={rejoin} data-testid="rejoin">
+            {room.role === 'host' ? 'Odayı yeniden aç' : 'Odaya tekrar gir'}
+          </button>
+          <p className="small muted">
+            {room.role === 'host' ? 'Karşı taraf aynı bağlantıyı ya da kodu tekrar kullanabilir.' : 'Odayı oluşturan cihazın da odayı yeniden açması gerekir.'}
+          </p>
+        </>
+      )}
       <button type="button" className="btn danger" onClick={leave} data-testid="leave">
         {connected ? 'Bağlantıyı kes' : 'Ana ekrana dön'}
       </button>

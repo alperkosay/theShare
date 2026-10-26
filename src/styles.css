@@ -1574,6 +1574,46 @@ select {
   gap: 12px;
 }
 
+.folder-row {
+  padding: 8px 8px 8px 14px;
+  border-radius: 18px;
+  background: var(--glass-strong);
+}
+
+/* --- install --- */
+
+.install-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.install-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 16px 12px 36px;
+  border-radius: 18px;
+  background: var(--glass-strong);
+}
+
+.install-steps .icon {
+  width: 16px;
+  height: 16px;
+  vertical-align: -3px;
+}
+
+/* --- recent rooms --- */
+
+.room-code {
+  font-size: 1.1rem;
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+}
+
 /* --- history tab --- */
 
 .tab-header {

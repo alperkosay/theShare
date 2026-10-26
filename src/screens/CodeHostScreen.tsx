@@ -20,7 +20,7 @@ export function CodeHostScreen() {
           <p className="pair-code" data-testid="pair-code" data-code={pairCode}>
             {formatCode(pairCode)}
           </p>
-          <p className="small muted">Diğer cihazda "Kod gir"e dokunup bu kodu yazsın. Kod 10 dakika geçerli.</p>
+          <p className="small muted">Diğer cihazda "Kod gir"e dokunup bu kodu yazsın. Oda 10 dakika bekler; 24 saat içinde "Son odalar"dan aynı kodla yeniden açabilirsin.</p>
           <ShareButton
             title="theShare"
             text={`theShare bağlantı kodum: ${formatCode(pairCode)}`}

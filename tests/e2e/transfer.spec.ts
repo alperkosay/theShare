@@ -192,6 +192,29 @@ test.describe('6-digit code pairing (public trackers)', () => {
     await expectConnected(host, joiner);
   });
 
+  test('the same code room can be reopened and rejoined after a disconnect', async ({ browser }) => {
+    test.setTimeout(90_000);
+    const { a: host, b: joiner } = await twoDevices(browser);
+    await host.goto('/');
+    await host.getByTestId('start-host').click();
+    const link = await readCode(host, /#k=\d{6}$/);
+    const code = link.slice(-6);
+    await joiner.goto(link.replace(/^https?:\/\/[^/]+/, ''));
+    await expectConnected(host, joiner);
+
+    // The joiner leaves; the host reopens the same room, the joiner rejoins from "recent rooms".
+    await joiner.getByTestId('tab-devices').click();
+    await joiner.getByTestId('leave').click();
+    await host.getByTestId('tab-devices').click();
+    await host.getByTestId('rejoin').click();
+    await expect(host.getByTestId('pair-code')).toHaveAttribute('data-code', code);
+
+    const recent = joiner.getByTestId('recent-rooms');
+    await expect(recent).toContainText(`${code.slice(0, 3)} ${code.slice(3)}`);
+    await recent.getByTestId('rejoin-room').click();
+    await expectConnected(host, joiner);
+  });
+
   test('a wrong code fails with a clear message', async ({ page }) => {
     test.setTimeout(60_000);
     await page.goto('/');
@@ -250,6 +273,33 @@ test('multiple files can be sent as one ZIP', async ({ browser }, testInfo) => {
   expect(sha256(await readFile(join(outDir, 'a.txt')))).toBe(sha256(files[0]!.buffer));
   expect(sha256(await readFile(join(outDir, 'şekil.bin')))).toBe(sha256(files[1]!.buffer));
   expect(sha256(await readFile(join(outDir, 'a (1).txt')))).toBe(sha256(files[2]!.buffer));
+});
+
+test('several files: accept all, save all, then later offers are accepted automatically', async ({ browser }) => {
+  const { a: host, b: joiner } = await twoDevices(browser);
+  await pair(host, joiner);
+
+  const files = ['bir.txt', 'iki.txt', 'üç.txt'].map((name) => ({ name, buffer: Buffer.from(`içerik ${name}`) }));
+  await host.getByTestId('file-input').setInputFiles(files.map((f) => ({ ...f, mimeType: 'text/plain' })));
+
+  const incoming = joiner.locator('[data-testid=transfer][data-direction=in]').first();
+  await expect(incoming.getByTestId('accept')).toHaveText('Tümünü kabul et (3)');
+  await incoming.getByTestId('auto-accept').check();
+  await incoming.getByTestId('accept').click();
+  await expect(incoming).toHaveAttribute('data-status', 'done', { timeout: 30_000 });
+
+  const downloads: string[] = [];
+  joiner.on('download', (d) => downloads.push(d.suggestedFilename()));
+  await incoming.getByTestId('download-all').click();
+  await expect.poll(() => downloads.length, { timeout: 10_000 }).toBe(3);
+  expect(downloads.sort()).toEqual(files.map((f) => f.name).sort());
+  await expect(incoming.getByTestId('download-all')).toHaveText(/tekrar kaydet/);
+  await expect(incoming).toContainText('İndirilenler klasörüne kaydedildi');
+
+  // Auto-accept is on for this connection: the next offer needs no click.
+  await host.getByTestId('file-input').setInputFiles([{ name: 'dort.txt', mimeType: 'text/plain', buffer: Buffer.from('4') }]);
+  await expect(joiner.locator('[data-testid=transfer][data-direction=in]')).toHaveCount(2);
+  await expect(joiner.locator('[data-testid=transfer][data-direction=in]').first()).toHaveAttribute('data-status', 'done', { timeout: 30_000 });
 });
 
 test('app opens offline after the first visit', async ({ browser }) => {
@@ -391,4 +441,31 @@ test('theme can be switched in the profile and is remembered', async ({ page }) 
   await page.getByTestId('profile-chip').click();
   await page.getByTestId('theme-mono').click();
   await expect(root).toHaveAttribute('data-theme', 'mono');
+});
+
+test('first visit suggests installing the app once; the profile offers it too', async ({ page }) => {
+  // Headless Chromium never offers an install; stand in for its event.
+  const offerInstall = () =>
+    page.evaluate(() => {
+      const event = Object.assign(new Event('beforeinstallprompt', { cancelable: true }), {
+        prompt: async () => {},
+        userChoice: Promise.resolve({ outcome: 'dismissed' }),
+      });
+      window.dispatchEvent(event);
+    });
+
+  await page.goto('/');
+  await offerInstall();
+  const sheet = page.getByTestId('install-prompt');
+  await expect(sheet).toBeVisible();
+  await sheet.getByRole('button', { name: 'Şimdi değil' }).click();
+  await expect(sheet).toBeHidden();
+
+  // Shown once per device.
+  await page.reload();
+  await offerInstall();
+  await page.waitForTimeout(2000); // past the first-run delay
+  await expect(page.getByTestId('install-prompt')).toBeHidden();
+  await page.getByTestId('profile-chip').click();
+  await expect(page.getByTestId('install-app')).toBeVisible();
 });

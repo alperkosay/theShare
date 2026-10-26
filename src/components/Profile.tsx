@@ -1,10 +1,13 @@
 import { useEffect, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
 import { profile, useProfile } from '../hooks/useProfile';
 import { history, resetEverything, useHistory } from '../hooks/useHistory';
+import { saving, useSaveTarget } from '../hooks/useSaving';
 import { deviceLabel, selfDevice } from '../lib/device';
 import { formatBytes } from '../lib/format';
 import { COPY_LIMIT_BYTES } from '../lib/storage/history';
 import { NAME_MAX, randomHue, validateName, type Theme } from '../lib/storage/profile';
+import { canPickFolder, canShareFiles, saveHint, type SaveMode } from '../lib/transfer/save';
+import { InstallSection } from './Install';
 import { Icon } from './Icon';
 import { Sheet } from './Sheet';
 
@@ -148,6 +151,64 @@ function Toggle({ label, hint, checked, onChange, testId }: { label: string; hin
   );
 }
 
+/** Where received files go: only the options this browser can do are listed. */
+function SaveSection() {
+  const { settings } = useProfile();
+  const { mode, folder } = useSaveTarget();
+  const [error, setError] = useState<string | null>(null);
+  const os = selfDevice().os;
+  const options: Array<[SaveMode, string]> = [
+    ['auto', 'Otomatik'],
+    ['download', 'İndirilenler klasörü'],
+  ];
+  if (canShareFiles()) options.push(['share', os === 'ios' ? 'Paylaş menüsü (Dosyalar / Fotoğraflar)' : 'Paylaş menüsü']);
+  if (canPickFolder()) options.push(['folder', 'Seçtiğim klasör']);
+
+  const pickFolder = async () => {
+    setError(null);
+    try {
+      await saving.pickFolder();
+    } catch (e) {
+      if ((e as DOMException).name !== 'AbortError') setError('Klasör seçilemedi.');
+    }
+  };
+
+  return (
+    <>
+      <h2 className="eyebrow">İndirme</h2>
+      <label className="setting-select">
+        <span className="grow">Gelen dosyaları kaydet</span>
+        <select
+          value={settings.saveMode}
+          onChange={(e) => void profile.updateSettings({ saveMode: e.target.value as SaveMode })}
+          data-testid="setting-save-mode"
+        >
+          {options.map(([id, label]) => (
+            <option key={id} value={id}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </label>
+      {settings.saveMode === 'folder' && canPickFolder() && (
+        <div className="row folder-row">
+          <Icon name="files" />
+          <span className="grow filename">{folder ? folder.name : 'Henüz klasör seçilmedi'}</span>
+          <button type="button" className="btn small" onClick={() => void pickFolder()} data-testid="pick-save-folder">
+            {folder ? 'Değiştir' : 'Klasör seç'}
+          </button>
+        </div>
+      )}
+      {error && (
+        <span className="small error-text" role="alert">
+          {error}
+        </span>
+      )}
+      <p className="small muted">{saveHint(mode, os, folder?.name ?? null)}</p>
+    </>
+  );
+}
+
 const RETENTION: Array<[string, number | null]> = [
   ['30 gün', 30],
   ['90 gün', 90],
@@ -195,6 +256,10 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
 
       <h2 className="eyebrow">Görünüm</h2>
       <ThemePicker />
+
+      <SaveSection />
+
+      <InstallSection />
 
       <h2 className="eyebrow">Geçmiş ve depolama</h2>
       <Toggle label="Geçmişi sakla" checked={settings.keepHistory} onChange={(v) => void profile.updateSettings({ keepHistory: v })} testId="setting-history" />

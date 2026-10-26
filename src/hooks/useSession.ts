@@ -4,6 +4,7 @@ import { SignalError } from '../lib/webrtc/signal-codec';
 import { pairingCode } from '../lib/webrtc/pairing-code';
 import { CODE_TTL_MS, generateCode, hostWithCode, joinWithCode, normalizeCode } from '../lib/signaling/code-rendezvous';
 import { TransferManager, type PeerInfo, type TextMessage, type TransferRecord, type TransferView } from '../lib/transfer/manager';
+import { rooms } from './useRooms';
 
 export type Role = 'host' | 'join';
 /**
@@ -18,7 +19,7 @@ export interface SessionSnapshot {
   method: Method;
   linkState: LinkState;
   error: string | null;
-  /** 6-digit code shown by the host in 'code' mode. */
+  /** 'code' mode: the 6-digit room code (shown by the host, entered by the joiner). Kept after a disconnect for rejoining. */
   pairCode: string | null;
   /** The other device's display name: from the nearby list, or its hello once connected. */
   peerName: string | null;
@@ -31,6 +32,8 @@ export interface SessionSnapshot {
   transfers: TransferView[];
   /** Text/clipboard messages, oldest first. */
   messages: TextMessage[];
+  /** Incoming offers are accepted without asking, for this connection only. */
+  autoAccept: boolean;
 }
 
 const initial: SessionSnapshot = {
@@ -46,6 +49,7 @@ const initial: SessionSnapshot = {
   pairingCode: null,
   transfers: [],
   messages: [],
+  autoAccept: false,
 };
 
 /** Who a finished transfer was with, for the history. */
@@ -70,6 +74,8 @@ class Session {
   link: PeerLink | null = null;
   manager: TransferManager | null = null;
   onRecord: (record: TransferRecord, context: RecordContext) => void = () => {};
+  /** The save folder for accepted files, if one is set (hooks/useSaving). */
+  saveFolder: () => FileSystemDirectoryHandle | null = () => null;
 
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -87,10 +93,14 @@ class Session {
   // 6-digit code
   // ---------------------------------------------------------------------------
 
-  /** Host: show a fresh code and wait for someone to enter it. */
-  startCodeHost(): void {
+  /**
+   * Host: show a code and wait for someone to enter it. Pass a recent code to
+   * reopen that room: a link shared earlier works again.
+   */
+  startCodeHost(reuse?: string): void {
     this.reset({ role: 'host', method: 'code' });
-    const code = generateCode();
+    const code = (reuse && normalizeCode(reuse)) || generateCode();
+    rooms.remember(code, 'host');
     this.set({ pairCode: code });
     this.stopRendezvous = hostWithCode(code, {
       onOffer: async (offer) => {
@@ -101,7 +111,7 @@ class Session {
     });
     this.expiryTimer = setTimeout(() => {
       if (!this.state.wasConnected) {
-        this.reset({ role: 'host', method: 'code', linkState: 'failed', error: 'Kodun süresi doldu.' });
+        this.reset({ role: 'host', method: 'code', pairCode: code, linkState: 'failed', error: 'Kimse katılmadı, kodun bekleme süresi doldu.' });
       }
     }, CODE_TTL_MS);
   }
@@ -110,7 +120,7 @@ class Session {
   async joinCode(input: string): Promise<string | null> {
     const code = normalizeCode(input);
     if (!code) return 'Kod 6 haneli olmalı.';
-    this.reset({ role: 'join', method: 'code' });
+    this.reset({ role: 'join', method: 'code', pairCode: code });
     const link = this.attachLink(new PeerLink({ remote: true }));
     try {
       const offer = await link.createOffer();
@@ -198,17 +208,31 @@ class Session {
 
   // ---------------------------------------------------------------------------
 
-  /** Same role and method, fresh connection (after a failure). */
+  /** Same role and method, fresh connection (after a failure). A code host keeps its code. */
   retry() {
-    const { role, method } = this.state;
+    const { role, method, pairCode } = this.state;
     if (method === 'nearby') {
       this.reset();
     } else if (role === 'host') {
-      if (method === 'code') this.startCodeHost();
+      if (method === 'code') this.startCodeHost(pairCode ?? undefined);
       else void this.startHost();
     } else {
       this.reset({ role, method });
     }
+  }
+
+  /**
+   * Back into a recent code room: the creator reopens it and waits, the other
+   * side enters the code again (CodeJoinScreen starts with pairCode).
+   */
+  rejoinRoom(code: string, role: Role): void {
+    if (role === 'host') this.startCodeHost(code);
+    else this.reset({ role: 'join', method: 'code', pairCode: code });
+  }
+
+  setAutoAccept(on: boolean): void {
+    if (this.manager) this.manager.autoAccept = on;
+    this.set({ autoAccept: on });
   }
 
   /** Returns a user-facing error, or null. */
@@ -270,6 +294,7 @@ class Session {
         this.stopRendezvous = null;
         clearTimeout(this.expiryTimer);
         const manager = new TransferManager(link);
+        manager.saveFolder = () => this.saveFolder();
         manager.onChange = (transfers) => this.set({ transfers });
         manager.onText = (message) => this.set({ messages: [...this.state.messages, message] });
         manager.onPeerInfo = (peer) => this.set({ peerName: peer.name, peer });
@@ -282,6 +307,8 @@ class Session {
         };
         this.manager = manager;
         this.set({ linkState, error, wasConnected: true });
+        const { method, role, pairCode } = this.state;
+        if (method === 'code' && role && pairCode) rooms.remember(pairCode, role);
         void pairingCode(link.localSdp, link.remoteSdp).then((code) => {
           if (this.link === link) this.set({ pairingCode: code });
         });

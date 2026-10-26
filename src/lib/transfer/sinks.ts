@@ -4,8 +4,9 @@ import type { FileMeta } from './protocol';
  * Where incoming bytes go. Three strategies, best first:
  *
  *  disk    File System Access API (Chromium desktop). Streams straight into the
- *          file the user picked; nothing accumulates in memory. Needs a user
- *          gesture, so the picker opens from the "accept" click.
+ *          file the user picked, or into the save folder chosen in the
+ *          settings; nothing accumulates in memory. Needs a user gesture, so
+ *          the picker/permission prompt opens from the "accept" click.
  *  opfs    Origin Private File System (Chrome/Edge/Android Chrome, Firefox,
  *          recent Safari). Streams to browser-managed disk storage, then the
  *          user downloads it. Temporary files are removed at session end.
@@ -69,7 +70,7 @@ function writableSink(writable: FileSystemWritableFileStream, finish: () => Prom
   };
 }
 
-async function uniqueFileHandle(dir: FileSystemDirectoryHandle, name: string): Promise<FileSystemFileHandle> {
+export async function uniqueFileHandle(dir: FileSystemDirectoryHandle, name: string): Promise<FileSystemFileHandle> {
   const dot = name.lastIndexOf('.');
   const base = dot > 0 ? name.slice(0, dot) : name;
   const ext = dot > 0 ? name.slice(dot) : '';
@@ -98,7 +99,11 @@ export async function pickDiskTarget(files: FileMeta[]): Promise<SinkFactory> {
       open: async () => writableSink(await handle.createWritable(), async () => ({ file: null })),
     };
   }
-  const dir = await window.showDirectoryPicker!({ id: 'theshare', mode: 'readwrite', startIn: 'downloads' });
+  return directorySinkFactory(await window.showDirectoryPicker!({ id: 'theshare', mode: 'readwrite', startIn: 'downloads' }));
+}
+
+/** Writes each file into a folder the user granted access to; name clashes become "name (1).ext". */
+export function directorySinkFactory(dir: FileSystemDirectoryHandle): SinkFactory {
   return {
     kind: 'disk',
     open: async (meta) => {

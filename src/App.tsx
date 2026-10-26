@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { session, useSession } from './hooks/useSession';
 import { useKeepAlive } from './hooks/useKeepAlive';
 import { nearby } from './hooks/useNearby';
+import { rooms } from './hooks/useRooms';
 import { SIGNAL_HASH_KEY } from './lib/webrtc/signal-codec';
 import { normalizeCode } from './lib/signaling/code-rendezvous';
 import { DevicesTab, type UrlInvite } from './screens/DevicesTab';
@@ -12,6 +13,7 @@ import { HistoryTab } from './screens/HistoryTab';
 import { Dock, type Tab } from './components/Dock';
 import { RequestSheet } from './components/Radar';
 import { UpdatePrompt } from './components/UpdatePrompt';
+import { InstallPrompt } from './components/Install';
 
 /**
  * Reads an invite from the URL fragment once, then strips it so a reload or
@@ -38,7 +40,9 @@ export function App() {
   useKeepAlive(transferring);
 
   useEffect(() => {
-    if (invite.code) session.reset({ role: 'join', method: 'code' });
+    // Our own room's link (e.g. opened again from the chat we shared it in) reopens the room instead of joining it.
+    if (invite.code && rooms.isOwn(invite.code)) session.startCodeHost(invite.code);
+    else if (invite.code) session.reset({ role: 'join', method: 'code' });
     else if (invite.offer) session.reset({ role: 'join', method: 'qr' });
   }, [invite]);
 
@@ -83,6 +87,7 @@ export function App() {
       />
       <RequestSheet />
       <UpdatePrompt busy={transferring} />
+      <InstallPrompt home={tab === 'devices' && !air && state.role === null && !state.wasConnected} />
     </div>
   );
 }

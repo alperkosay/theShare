@@ -1,4 +1,5 @@
 import { randomDeviceName } from '../device';
+import { SAVE_MODES, type SaveMode } from '../transfer/save';
 
 /** "soft": neumorphism (default). "mono": black & white, Apple-like. "pastel": pastel-filled cards. */
 export type Theme = 'mono' | 'pastel' | 'soft';
@@ -14,6 +15,8 @@ export interface Settings {
   keepFiles: boolean;
   /** History older than this is deleted; null keeps it forever. */
   retentionDays: number | null;
+  /** Where received files are saved (lib/transfer/save). */
+  saveMode: SaveMode;
 }
 
 export interface Profile {
@@ -31,6 +34,7 @@ export const DEFAULT_SETTINGS: Settings = {
   includeTexts: false,
   keepFiles: true,
   retentionDays: 90,
+  saveMode: 'auto',
 };
 
 export const NAME_MIN = 2;
@@ -70,6 +74,7 @@ export function normalizeProfile(stored: Partial<Profile> | undefined): Profile 
   const valid = typeof stored.name === 'string' && 'name' in validateName(stored.name);
   const settings = { ...DEFAULT_SETTINGS, ...stored.settings };
   if (!THEMES.includes(settings.theme)) settings.theme = DEFAULT_SETTINGS.theme;
+  if (!SAVE_MODES.includes(settings.saveMode)) settings.saveMode = DEFAULT_SETTINGS.saveMode;
   return {
     name: valid ? stored.name! : fresh.name,
     deviceId: typeof stored.deviceId === 'string' && stored.deviceId ? stored.deviceId : fresh.deviceId,

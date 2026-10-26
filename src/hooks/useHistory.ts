@@ -10,6 +10,8 @@ import {
 import { handleOf, recordOf, resolveRecord, type ResolveResult } from '../lib/storage/resend';
 import type { TransferRecord } from '../lib/transfer/manager';
 import { profile } from './useProfile';
+import { rooms } from './useRooms';
+import { saving } from './useSaving';
 import { session, type RecordContext } from './useSession';
 
 /** Files waiting for a connection (or for the current send to finish). In memory only. */
@@ -254,8 +256,10 @@ export function useHistory(): HistorySnapshot {
   return useSyncExternalStore(history.subscribe, history.getSnapshot);
 }
 
-/** "Reset everything": history, stored files, name, device id and settings. */
+/** "Reset everything": history, stored files, recent rooms, save folder, name, device id and settings. */
 export async function resetEverything(): Promise<void> {
   history.forgetAll();
+  saving.forget();
+  rooms.clear();
   await profile.reset();
 }
