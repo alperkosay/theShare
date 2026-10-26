@@ -69,6 +69,8 @@ describe('stored profile', () => {
     expect(p.settings).toEqual({ ...DEFAULT_SETTINGS, includeTexts: true });
     expect(normalizeProfile({ settings: { theme: 'neon' } as never }).settings.theme).toBe('soft');
     expect(normalizeProfile({ settings: { theme: 'pastel' } as never }).settings.theme).toBe('pastel');
+    expect(normalizeProfile({ settings: { scheme: 'dark' } as never }).settings.scheme).toBe('dark');
+    expect(normalizeProfile({ settings: { scheme: 'sepia' } as never }).settings.scheme).toBe('system');
   });
 
   it('creates a fresh identity when nothing is stored', () => {

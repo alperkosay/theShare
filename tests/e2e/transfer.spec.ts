@@ -283,7 +283,7 @@ test('several files: accept all, save all, then later offers are accepted automa
   await host.getByTestId('file-input').setInputFiles(files.map((f) => ({ ...f, mimeType: 'text/plain' })));
 
   const incoming = joiner.locator('[data-testid=transfer][data-direction=in]').first();
-  await expect(incoming.getByTestId('accept')).toHaveText('Tümünü kabul et (3)');
+  await expect(incoming.getByTestId('accept')).toHaveText('Tümünü kabul et');
   await incoming.getByTestId('auto-accept').check();
   await incoming.getByTestId('accept').click();
   await expect(incoming).toHaveAttribute('data-status', 'done', { timeout: 30_000 });
@@ -293,7 +293,7 @@ test('several files: accept all, save all, then later offers are accepted automa
   await incoming.getByTestId('download-all').click();
   await expect.poll(() => downloads.length, { timeout: 10_000 }).toBe(3);
   expect(downloads.sort()).toEqual(files.map((f) => f.name).sort());
-  await expect(incoming.getByTestId('download-all')).toHaveText(/tekrar kaydet/);
+  await expect(incoming.getByTestId('download-all')).toHaveText('Tekrar kaydet');
   await expect(incoming).toContainText('İndirilenler klasörüne kaydedildi');
 
   // Auto-accept is on for this connection: the next offer needs no click.
@@ -441,6 +441,29 @@ test('theme can be switched in the profile and is remembered', async ({ page }) 
   await page.getByTestId('profile-chip').click();
   await page.getByTestId('theme-mono').click();
   await expect(root).toHaveAttribute('data-theme', 'mono');
+});
+
+test('light/dark follows the device unless forced in the profile; sheets close with their X', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.goto('/');
+  const root = page.locator('html');
+  await expect(root).toHaveAttribute('data-scheme', 'light');
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await expect(root).toHaveAttribute('data-scheme', 'dark'); // "system" follows live
+
+  await page.getByTestId('profile-chip').click();
+  await page.getByTestId('scheme-light').click();
+  await expect(root).toHaveAttribute('data-scheme', 'light');
+  await expect(page.getByTestId('scheme-light')).toHaveAttribute('aria-pressed', 'true');
+  await page.getByTestId('sheet-close').click();
+  await expect(page.getByTestId('settings')).toBeHidden();
+
+  await page.reload();
+  await expect(root).toHaveAttribute('data-scheme', 'light'); // forced, despite the dark device
+  await page.getByTestId('profile-chip').click();
+  await page.getByTestId('scheme-dark').click();
+  await page.emulateMedia({ colorScheme: 'light' });
+  await expect(root).toHaveAttribute('data-scheme', 'dark');
 });
 
 test('first visit suggests installing the app once; the profile offers it too', async ({ page }) => {

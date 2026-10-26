@@ -1,11 +1,25 @@
 import { useSyncExternalStore } from 'react';
 import { setSelfIdentity } from '../lib/device';
 import { dbGet, dbPut, deleteDb } from '../lib/storage/db';
-import { newProfile, normalizeProfile, type Profile, type Settings } from '../lib/storage/profile';
+import { newProfile, normalizeProfile, type Profile, type Scheme, type Settings } from '../lib/storage/profile';
 
 const PROFILE_KEY = 'me';
 /** A broken IndexedDB (some private modes) must not keep the app from starting. */
 const LOAD_TIMEOUT_MS = 1500;
+
+const systemDark = window.matchMedia?.('(prefers-color-scheme: dark)');
+
+/**
+ * Light/dark tokens in styles.css hang off data-scheme on <html>, always
+ * "light" or "dark": "system" is resolved here and follows the device live.
+ * The browser bar (theme-color) takes the page background.
+ */
+function applyScheme(scheme: Scheme): void {
+  const root = document.documentElement;
+  root.dataset.scheme = scheme === 'dark' || (scheme === 'system' && systemDark?.matches) ? 'dark' : 'light';
+  const bg = getComputedStyle(root).getPropertyValue('--bg').trim();
+  if (bg) for (const meta of document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')) meta.content = bg;
+}
 
 /**
  * The user's name, persistent device id and settings, saved only on this
@@ -17,6 +31,12 @@ class ProfileStore {
   private listeners = new Set<() => void>();
   /** False when IndexedDB failed: nothing persists, the settings say so. */
   persistent = true;
+
+  constructor() {
+    // Right away, so the first paint already has the device's light/dark; the saved choice follows on load.
+    applyScheme(this.state.settings.scheme);
+    systemDark?.addEventListener?.('change', () => applyScheme(this.state.settings.scheme));
+  }
 
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -30,6 +50,7 @@ class ProfileStore {
     setSelfIdentity(profile.name, profile.deviceId);
     // Themes are token sets in styles.css, selected by this attribute.
     document.documentElement.dataset.theme = profile.settings.theme;
+    applyScheme(profile.settings.scheme);
     for (const l of this.listeners) l();
   }
 

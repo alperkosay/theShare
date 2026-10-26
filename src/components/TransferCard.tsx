@@ -118,7 +118,7 @@ export function TransferCard({ transfer: t }: { transfer: TransferView }) {
       {!single && savable.length > 1 && (
         <div className="actions">
           <button type="button" className="btn primary" onClick={() => save(unsaved.length ? unsaved : savable)} data-testid="download-all">
-            <Icon name="arrowDown" /> {unsaved.length ? `Tümünü kaydet (${unsaved.length})` : 'Tümünü tekrar kaydet'}
+            {unsaved.length ? 'Tümünü kaydet' : 'Tekrar kaydet'}
           </button>
           {target.mode !== 'folder' && canZip(savable.map((i) => t.received[i]!.file!)) && (
             <button type="button" className="btn" onClick={saveZip} disabled={zipping} data-testid="download-zip">
@@ -132,7 +132,7 @@ export function TransferCard({ transfer: t }: { transfer: TransferView }) {
         <>
           <div className="actions">
             <button type="button" className="btn primary" onClick={() => void manager?.accept(t.id)} data-testid="accept">
-              {single ? 'Kabul et' : `Tümünü kabul et (${t.files.length})`}
+              {single ? 'Kabul et' : 'Tümünü kabul et'}
             </button>
             <button type="button" className="btn" onClick={() => manager?.reject(t.id)} data-testid="reject">
               Reddet

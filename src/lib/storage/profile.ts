@@ -5,8 +5,13 @@ import { SAVE_MODES, type SaveMode } from '../transfer/save';
 export type Theme = 'mono' | 'pastel' | 'soft';
 export const THEMES: readonly Theme[] = ['mono', 'pastel', 'soft'];
 
+/** Light/dark: follow the device, or force one. */
+export type Scheme = 'system' | 'light' | 'dark';
+export const SCHEMES: readonly Scheme[] = ['system', 'light', 'dark'];
+
 export interface Settings {
   theme: Theme;
+  scheme: Scheme;
   /** Record sent and received transfers on this device. */
   keepHistory: boolean;
   /** Also record texts (first ~200 characters). Off by default: clipboards hold passwords. */
@@ -30,6 +35,7 @@ export interface Profile {
 
 export const DEFAULT_SETTINGS: Settings = {
   theme: 'soft',
+  scheme: 'system',
   keepHistory: true,
   includeTexts: false,
   keepFiles: true,
@@ -74,6 +80,7 @@ export function normalizeProfile(stored: Partial<Profile> | undefined): Profile 
   const valid = typeof stored.name === 'string' && 'name' in validateName(stored.name);
   const settings = { ...DEFAULT_SETTINGS, ...stored.settings };
   if (!THEMES.includes(settings.theme)) settings.theme = DEFAULT_SETTINGS.theme;
+  if (!SCHEMES.includes(settings.scheme)) settings.scheme = DEFAULT_SETTINGS.scheme;
   if (!SAVE_MODES.includes(settings.saveMode)) settings.saveMode = DEFAULT_SETTINGS.saveMode;
   return {
     name: valid ? stored.name! : fresh.name,

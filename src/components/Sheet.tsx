@@ -1,5 +1,6 @@
 import { useEffect, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { Icon } from './Icon';
 
 interface Props {
   label: string;
@@ -9,7 +10,7 @@ interface Props {
 }
 
 /**
- * Bottom sheet for forms and details; closes on backdrop tap and Escape.
+ * Bottom sheet for forms and details; closes with its X button, a backdrop tap or Escape.
  * Rendered into <body>: the tab's entrance animation transforms its container,
  * which would otherwise trap position: fixed inside it.
  */
@@ -23,7 +24,13 @@ export function Sheet({ label, onClose, children, testId }: Props) {
   return createPortal(
     <div className="sheet-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="sheet glass form" role="dialog" aria-modal="true" aria-label={label} data-testid={testId}>
-        <span className="sheet-grip" aria-hidden="true" />
+        {/* Sticky, so the X stays reachable while a long sheet scrolls. */}
+        <div className="sheet-head">
+          <span className="sheet-grip" aria-hidden="true" />
+          <button type="button" className="sheet-close" onClick={onClose} aria-label="Kapat" data-testid="sheet-close">
+            <Icon name="close" />
+          </button>
+        </div>
         {children}
       </div>
     </div>,

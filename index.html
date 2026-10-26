@@ -12,6 +12,14 @@
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
     <title>theShare</title>
+    <!-- Before the app sets data-scheme: no white flash on dark devices (default theme's dark background). -->
+    <style>
+      @media (prefers-color-scheme: dark) {
+        html:not([data-scheme]) body {
+          background: #252a33;
+        }
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

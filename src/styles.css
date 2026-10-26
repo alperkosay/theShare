@@ -3,7 +3,8 @@
  * Quiet, Apple-like monochrome: neutral grey background, white cards (black in
  * dark mode), black/white "ink" for primary actions, pill-shaped controls and
  * soft pastels only as small accents (icon tiles, status, avatars). No
- * gradients or glows. Follows the system light/dark setting.
+ * gradients or glows. Light/dark comes from data-scheme on <html>, set from
+ * the profile (system, light or dark; hooks/useProfile).
  * All motion is transform/opacity only and switches off for reduced motion.
  */
 
@@ -41,24 +42,22 @@
   --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI Variable Text', 'Segoe UI', 'Helvetica Neue', Roboto, Arial, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-    --bg: #000000;
-    --glass: #1c1c1e;
-    --glass-strong: #2c2c2e;
-    --glass-border: rgb(255 255 255 / 7%);
-    --text: #f5f5f7;
-    --muted: #98989d;
-    --ink: #f5f5f7;
-    --on-ink: #000000;
-    --focus: rgb(255 255 255 / 45%);
-    --ok: #7fd8a4;
-    --error: #ff8a95;
-    --error-bg: rgb(253 217 221 / 14%);
-    --shadow: none;
-    --veil: rgb(0 0 0 / 55%);
-  }
+:root:where([data-scheme='dark']) {
+  color-scheme: dark;
+  --bg: #000000;
+  --glass: #1c1c1e;
+  --glass-strong: #2c2c2e;
+  --glass-border: rgb(255 255 255 / 7%);
+  --text: #f5f5f7;
+  --muted: #98989d;
+  --ink: #f5f5f7;
+  --on-ink: #000000;
+  --focus: rgb(255 255 255 / 45%);
+  --ok: #7fd8a4;
+  --error: #ff8a95;
+  --error-bg: rgb(253 217 221 / 14%);
+  --shadow: none;
+  --veil: rgb(0 0 0 / 55%);
 }
 
 * {
@@ -93,6 +92,7 @@ h2 {
 
 button,
 input,
+select,
 textarea {
   font: inherit;
   color: inherit;
@@ -380,11 +380,15 @@ textarea {
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
+/* Equal widths while the labels fit on one line; otherwise the next button wraps below instead of the text. */
 .actions .btn {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: fit-content;
+  white-space: nowrap;
 }
 
 .icon {
@@ -796,6 +800,45 @@ textarea {
   margin-bottom: 8px;
   border-radius: 2px;
   background: var(--glass-border);
+}
+
+.sheet-head {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+  align-self: stretch;
+  display: flex;
+  justify-content: center;
+  min-height: 30px;
+  /* Only the X takes taps; the content scrolling under the rest stays usable. */
+  pointer-events: none;
+}
+
+.sheet-close {
+  position: absolute;
+  top: -2px;
+  right: -6px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--glass-strong);
+  color: var(--text);
+  cursor: pointer;
+  pointer-events: auto;
+  transition: transform 0.18s var(--spring);
+}
+
+.sheet-close:active {
+  transform: scale(0.92);
+}
+
+.sheet-close .icon {
+  width: 18px;
+  height: 18px;
 }
 
 .sheet .actions {
@@ -2038,24 +2081,22 @@ select {
   --font: ui-rounded, 'SF Pro Rounded', -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Display', 'Segoe UI', 'Helvetica Neue', Roboto, Arial, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root[data-theme='pastel'] {
-    color-scheme: dark;
-    --bg: #10151d;
-    --glass: #1b2230;
-    --glass-strong: #263042;
-    --glass-border: rgb(255 255 255 / 6%);
-    --text: #eef3fb;
-    --muted: #9eaabf;
-    --ink: #d6e7ff;
-    --on-ink: #1b2230;
-    --focus: rgb(156 196 255 / 70%);
-    --ok: #86dcb0;
-    --error: #ff8fa3;
-    --error-bg: rgb(255 214 222 / 14%);
-    --shadow: 0 1px 2px rgb(0 0 0 / 30%), 0 16px 36px -18px rgb(0 0 0 / 65%);
-    --veil: rgb(0 0 0 / 55%);
-  }
+:root[data-theme='pastel']:where([data-scheme='dark']) {
+  color-scheme: dark;
+  --bg: #10151d;
+  --glass: #1b2230;
+  --glass-strong: #263042;
+  --glass-border: rgb(255 255 255 / 6%);
+  --text: #eef3fb;
+  --muted: #9eaabf;
+  --ink: #d6e7ff;
+  --on-ink: #1b2230;
+  --focus: rgb(156 196 255 / 70%);
+  --ok: #86dcb0;
+  --error: #ff8fa3;
+  --error-bg: rgb(255 214 222 / 14%);
+  --shadow: 0 1px 2px rgb(0 0 0 / 30%), 0 16px 36px -18px rgb(0 0 0 / 65%);
+  --veil: rgb(0 0 0 / 55%);
 }
 
 :root[data-theme='pastel'] .glass {
@@ -2063,35 +2104,33 @@ select {
 }
 
 /* Each pastel card casts a shadow in a deeper shade of its own colour (light mode; dark mode keeps plain shadows). */
-@media (prefers-color-scheme: light) {
-  :root[data-theme='pastel'] :is(.option, .radar-card, .peer-bar, .link-hero, .dropzone, .pending, .empty) {
-    box-shadow:
-      0 1px 2px rgb(37 48 71 / 5%),
-      0 10px 22px -10px var(--tint-shadow),
-      0 22px 44px -22px var(--tint-shadow);
-  }
+:root[data-theme='pastel']:where([data-scheme='light']) :is(.option, .radar-card, .peer-bar, .link-hero, .dropzone, .pending, .empty) {
+  box-shadow:
+    0 1px 2px rgb(37 48 71 / 5%),
+    0 10px 22px -10px var(--tint-shadow),
+    0 22px 44px -22px var(--tint-shadow);
+}
 
-  :root[data-theme='pastel'] .option,
-  :root[data-theme='pastel'] .empty {
-    --tint-shadow: rgb(225 135 80 / 38%);
-  }
+:root[data-theme='pastel']:where([data-scheme='light']) .option,
+:root[data-theme='pastel']:where([data-scheme='light']) .empty {
+  --tint-shadow: rgb(225 135 80 / 38%);
+}
 
-  :root[data-theme='pastel'] .option + .option,
-  :root[data-theme='pastel'] .peer-bar {
-    --tint-shadow: rgb(60 170 115 / 34%);
-  }
+:root[data-theme='pastel']:where([data-scheme='light']) .option + .option,
+:root[data-theme='pastel']:where([data-scheme='light']) .peer-bar {
+  --tint-shadow: rgb(60 170 115 / 34%);
+}
 
-  :root[data-theme='pastel'] :is(.radar-card, .link-hero) {
-    --tint-shadow: rgb(70 130 220 / 34%);
-  }
+:root[data-theme='pastel']:where([data-scheme='light']) :is(.radar-card, .link-hero) {
+  --tint-shadow: rgb(70 130 220 / 34%);
+}
 
-  :root[data-theme='pastel'] :is(.dropzone, .pending) {
-    --tint-shadow: rgb(215 170 40 / 34%);
-  }
+:root[data-theme='pastel']:where([data-scheme='light']) :is(.dropzone, .pending) {
+  --tint-shadow: rgb(215 170 40 / 34%);
+}
 
-  :root[data-theme='pastel'] :is(.peer-bar, .link-hero).off {
-    --tint-shadow: rgb(225 95 120 / 34%);
-  }
+:root[data-theme='pastel']:where([data-scheme='light']) :is(.peer-bar, .link-hero).off {
+  --tint-shadow: rgb(225 95 120 / 34%);
 }
 
 /* Pastel-filled cards: dark text and translucent white fills inside, in light and dark mode alike. */
@@ -2239,26 +2278,24 @@ select {
   --font: ui-rounded, 'SF Pro Rounded', -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Display', 'Segoe UI', 'Helvetica Neue', Roboto, Arial, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root[data-theme='soft'] {
-    color-scheme: dark;
-    --bg: #252a33;
-    --glass: #252a33;
-    --glass-strong: #252a33;
-    --glass-border: rgb(255 255 255 / 6%);
-    --text: #e8edf5;
-    --muted: #93a0b4;
-    --ink: #e8edf5;
-    --on-ink: #252a33;
-    --blue-text: #9cc4ff;
-    --ok: #8fdcb4;
-    --error: #ff9aab;
-    --surface: linear-gradient(145deg, #282d37, #22272f);
-    --well: #22262e;
-    --light: #313744;
-    --dark: #191c22;
-    --veil: rgb(0 0 0 / 45%);
-  }
+:root[data-theme='soft']:where([data-scheme='dark']) {
+  color-scheme: dark;
+  --bg: #252a33;
+  --glass: #252a33;
+  --glass-strong: #252a33;
+  --glass-border: rgb(255 255 255 / 6%);
+  --text: #e8edf5;
+  --muted: #93a0b4;
+  --ink: #e8edf5;
+  --on-ink: #252a33;
+  --blue-text: #9cc4ff;
+  --ok: #8fdcb4;
+  --error: #ff9aab;
+  --surface: linear-gradient(145deg, #282d37, #22272f);
+  --well: #22262e;
+  --light: #313744;
+  --dark: #191c22;
+  --veil: rgb(0 0 0 / 45%);
 }
 
 /* A little more air than the other themes, so each raised surface stands on its own. */
@@ -2309,7 +2346,7 @@ select {
 }
 
 /* Raised, smaller: buttons and round tiles. */
-:root[data-theme='soft'] :is(.btn, .avatar, .arrow, .option-icon, .dropzone-icon, .orbit-bubble, .thumb, .theme-option, .profile-chip) {
+:root[data-theme='soft'] :is(.btn, .avatar, .arrow, .option-icon, .dropzone-icon, .orbit-bubble, .thumb, .theme-option, .profile-chip, .sheet-close) {
   border-color: transparent;
   background: var(--surface);
   box-shadow: var(--raise-sm);

@@ -5,7 +5,7 @@ import { saving, useSaveTarget } from '../hooks/useSaving';
 import { deviceLabel, selfDevice } from '../lib/device';
 import { formatBytes } from '../lib/format';
 import { COPY_LIMIT_BYTES } from '../lib/storage/history';
-import { NAME_MAX, randomHue, validateName, type Theme } from '../lib/storage/profile';
+import { NAME_MAX, randomHue, validateName, type Scheme, type Theme } from '../lib/storage/profile';
 import { canPickFolder, canShareFiles, saveHint, type SaveMode } from '../lib/transfer/save';
 import { InstallSection } from './Install';
 import { Icon } from './Icon';
@@ -138,6 +138,33 @@ function ThemePicker() {
   );
 }
 
+const SCHEME_OPTIONS: Array<[Scheme, string]> = [
+  ['system', 'Sistem'],
+  ['light', 'Açık'],
+  ['dark', 'Koyu'],
+];
+
+/** Light/dark mode: follow the device or force one. Applies to every theme. */
+function SchemePicker() {
+  const { settings } = useProfile();
+  return (
+    <div className="segmented" role="group" aria-label="Açık / koyu mod">
+      {SCHEME_OPTIONS.map(([id, label]) => (
+        <button
+          key={id}
+          type="button"
+          className={settings.scheme === id ? 'active' : ''}
+          aria-pressed={settings.scheme === id}
+          onClick={() => void profile.updateSettings({ scheme: id })}
+          data-testid={`scheme-${id}`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function Toggle({ label, hint, checked, onChange, testId }: { label: string; hint?: ReactNode; checked: boolean; onChange: (v: boolean) => void; testId: string }) {
   return (
     <label className="check setting">
@@ -255,6 +282,7 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
       )}
 
       <h2 className="eyebrow">Görünüm</h2>
+      <SchemePicker />
       <ThemePicker />
 
       <SaveSection />
