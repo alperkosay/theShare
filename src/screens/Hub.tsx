@@ -7,6 +7,7 @@ import { formatSpeed } from '../lib/format';
 import { formatCode } from '../lib/signaling/code-rendezvous';
 import { ActivityFeed } from '../components/Activity';
 import { DeviceIcon, Icon, type IconName } from '../components/Icon';
+import { VerifyBadge } from '../components/Verify';
 import type { Tab } from '../components/Dock';
 
 /** Unsaved received files are lost when the session ends; ask first. */
@@ -31,7 +32,7 @@ interface Action {
  * connection can be rejoined or left.
  */
 export function Hub({ onOpen }: { onOpen: (tab: Tab) => void }) {
-  const { linkState, peerName, peer, pairingCode, error, transfers, method, role, pairCode } = useSession();
+  const { linkState, peerName, peer, error, transfers, method, role, pairCode } = useSession();
   const { supported, local, remote } = useScreenShare();
   const self = selfDevice();
   const connected = linkState === 'connected';
@@ -119,10 +120,8 @@ export function Hub({ onOpen }: { onOpen: (tab: Tab) => void }) {
                 <span />
                 <span />
               </span>
-              {connected && pairingCode ? (
-                <span className="small muted hub-code" title="Güvenlik kodu: iki ekranda aynı olmalı. Farklıysa bağlantıyı hemen kesin.">
-                  <Icon name="shield" /> Güvenlik kodu <strong className="text tabular">{pairingCode}</strong>
-                </span>
+              {connected ? (
+                <VerifyBadge className="small muted hub-code" label />
               ) : (
                 <span className="small muted">Sunucu yok, aradaki kimse görmez</span>
               )}

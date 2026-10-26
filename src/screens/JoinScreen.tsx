@@ -12,9 +12,10 @@ export function JoinScreen({ initialOffer }: { initialOffer: string | null }) {
   const [busy, setBusy] = useState(false);
   const autoStarted = useRef(false);
 
-  const submitOffer = async (text: string) => {
+  /** An offer from the URL (the phone's camera app opened the link) could also have come through a messenger: not `scanned`. */
+  const submitOffer = async (text: string, scanned = false) => {
     setBusy(true);
-    setOfferError(await session.startJoin(text));
+    setOfferError(await session.startJoin(text, { scanned }));
     setBusy(false);
   };
 
@@ -37,7 +38,7 @@ export function JoinScreen({ initialOffer }: { initialOffer: string | null }) {
           autoScan={!initialOffer}
           busy={busy}
           error={offerError}
-          onSubmit={(t) => void submitOffer(t)}
+          onSubmit={(t, scanned) => void submitOffer(t, scanned)}
         />
       </>
     );

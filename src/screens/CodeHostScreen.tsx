@@ -1,11 +1,11 @@
 import { useSession } from '../hooks/useSession';
-import { formatCode } from '../lib/signaling/code-rendezvous';
+import { formatCode, MAX_FAILED } from '../lib/signaling/code-rendezvous';
 import { QrCode } from '../components/QrCode';
 import { CopyButton, ShareButton } from '../components/CopyButton';
 import { BackButton, Failed, Waiting } from './common';
 
 export function CodeHostScreen() {
-  const { linkState, pairCode, error } = useSession();
+  const { linkState, pairCode, error, codeFailures } = useSession();
   const link = pairCode ? `${location.href.split('#')[0]}#k=${pairCode}` : null;
 
   let content;
@@ -35,6 +35,12 @@ export function CodeHostScreen() {
           <QrCode text={link} label="Kod QR'ı" />
           <p className="small muted">Yanınızdaysa: telefonun kamerasıyla bu QR'ı okutsun.</p>
         </div>
+
+        {codeFailures > 0 && (
+          <p className="notice error" role="alert" data-testid="code-failures">
+            Biri bu odaya yanlış kodla girmeyi denedi ({codeFailures}/{MAX_FAILED}). Kod {MAX_FAILED} kez yanlış girilirse oda kapanır.
+          </p>
+        )}
 
         <Waiting text="Diğer cihaz bekleniyor…" />
       </>

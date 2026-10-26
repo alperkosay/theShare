@@ -12,6 +12,7 @@ import { InkLayer } from '../components/InkLayer';
 import { InkToolbar } from '../components/InkToolbar';
 import { ChatPanel } from '../components/ChatPanel';
 import { Icon, type IconName } from '../components/Icon';
+import { VerifyBadge } from '../components/Verify';
 
 type VideoRefs = Record<Surface, RefObject<HTMLVideoElement | null>>;
 
@@ -24,7 +25,7 @@ const isTyping = (target: EventTarget | null) => target instanceof HTMLElement &
  */
 export function Meeting() {
   const { local, remote, remoteAudio, soundOn, localSince, remoteSince, supported } = useScreenShare();
-  const { peerName, pairingCode, linkState, messages } = useSession();
+  const { peerName, linkState, messages } = useSession();
   const { active: drawing } = useInk();
   const quality = useProfile().settings.screenQuality;
   const popoutWin = usePopout();
@@ -176,12 +177,7 @@ export function Meeting() {
           <span className="meet-person">{local ? 'Siz · sunuyor' : 'Siz'}</span>
           <span className="meet-person">{remote ? `${name} · sunuyor` : name}</span>
         </span>
-        {pairingCode && (
-          <span className="sec-code" title="Güvenlik kodu: iki ekranda aynı olmalı">
-            <Icon name="shield" />
-            <strong>{pairingCode}</strong>
-          </span>
-        )}
+        <VerifyBadge />
       </header>
 
       <div className="meet-body">

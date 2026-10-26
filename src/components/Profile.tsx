@@ -8,7 +8,8 @@ import { COPY_LIMIT_BYTES } from '../lib/storage/history';
 import { NAME_MAX, randomHue, validateName, type Scheme, type Theme } from '../lib/storage/profile';
 import { canPickFolder, canShareFiles, saveHint, type SaveMode } from '../lib/transfer/save';
 import { InstallSection } from './Install';
-import { Icon } from './Icon';
+import { trusted, useTrusted } from '../hooks/useTrusted';
+import { DeviceIcon, Icon } from './Icon';
 import { Sheet } from './Sheet';
 
 /** Round avatar with the name's first character on the profile's colour. */
@@ -243,6 +244,38 @@ const RETENTION: Array<[string, number | null]> = [
   ['Süresiz', null],
 ];
 
+/** Devices verified once connect as "verified" from then on; removing one asks for the code again next time. */
+function TrustedSection() {
+  const list = useTrusted();
+  return (
+    <>
+      <h2 className="eyebrow">Güvenilen cihazlar</h2>
+      {list.length === 0 ? (
+        <p className="small muted">Güvenlik kodunu karşılaştırdığınız ya da QR ile bağlandığınız cihazlar burada listelenir. Sonraki bağlantılarda kendiliğinden doğrulanırlar.</p>
+      ) : (
+        <ul className="trusted-list" data-testid="trusted-list">
+          {list.map((d) => (
+            <li key={d.fingerprint} className="trusted-row" data-testid="trusted-device">
+              <span className="avatar">
+                <DeviceIcon kind={d.kind} />
+              </span>
+              <span className="grow">
+                <strong className="block">{d.name}</strong>
+                <span className="small muted">
+                  {deviceLabel(d)} · son bağlantı {new Date(d.lastSeen).toLocaleDateString('tr-TR')}
+                </span>
+              </span>
+              <button type="button" className="btn small" onClick={() => trusted.remove(d.fingerprint)} aria-label={`${d.name} cihazını listeden kaldır`}>
+                Kaldır
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  );
+}
+
 export function SettingsSheet({ onClose }: { onClose: () => void }) {
   const { settings, hue, deviceId } = useProfile();
   const { copyBytes, entries } = useHistory();
@@ -274,12 +307,14 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
       {/* key: a reset gives a new identity; start the field over */}
       <NameForm key={deviceId} />
       <p className="small muted">
-        Ad bir kimlik doğrulaması değildir: herkes kendine istediği adı verebilir. Bağlanırken cihaz türüne ve güvenlik koduna bakın.
+        Ad bir kimlik doğrulaması değildir: herkes kendine istediği adı verebilir. Cihazı tanıtan ad değil, güvenlik kodu ve “Doğrulanmış” rozetidir.
       </p>
 
       {!profile.persistent && (
         <p className="notice small">Bu tarayıcıda kalıcı depolama kullanılamıyor (ör. gizli pencere). Ayarlar ve geçmiş yalnızca bu ziyaret için geçerli.</p>
       )}
+
+      <TrustedSection />
 
       <h2 className="eyebrow">Görünüm</h2>
       <SchemePicker />
@@ -331,7 +366,7 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
         <button
           type="button"
           className="btn danger"
-          onClick={() => confirmThen('Ad, ayarlar, geçmiş ve saklanan dosyalar silinecek. Emin misin?', resetEverything)}
+          onClick={() => confirmThen('Ad, ayarlar, geçmiş, saklanan dosyalar ve güvenilen cihazlar silinecek; bu cihaz yeni bir kimlik alacak. Emin misin?', resetEverything)}
           data-testid="reset-all"
         >
           Her şeyi sıfırla

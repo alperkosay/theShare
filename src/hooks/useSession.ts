@@ -1,10 +1,14 @@
 import { useSyncExternalStore } from 'react';
 import { PeerLink, type LinkState } from '../lib/webrtc/peer';
 import { SignalError } from '../lib/webrtc/signal-codec';
-import { pairingCode } from '../lib/webrtc/pairing-code';
-import { CODE_TTL_MS, generateCode, hostWithCode, joinWithCode, normalizeCode } from '../lib/signaling/code-rendezvous';
+import { SasExchange } from '../lib/webrtc/verify';
+import { judgeTrust, type TrustedDevice } from '../lib/storage/trusted';
+import { PROTOCOL_VERSION } from '../lib/transfer/protocol';
+import { CODE_TTL_MS, generateCode, hostWithCode, joinWithCode, MAX_FAILED, normalizeCode, type Requester } from '../lib/signaling/code-rendezvous';
+import { selfDevice } from '../lib/device';
 import { TransferManager, type PeerInfo, type TextMessage, type TransferRecord, type TransferView } from '../lib/transfer/manager';
 import { rooms } from './useRooms';
+import { trusted } from './useTrusted';
 
 export type Role = 'host' | 'join';
 /**
@@ -13,6 +17,18 @@ export type Role = 'host' | 'join';
  * 'qr': two QR scans, works offline on a LAN.
  */
 export type Method = 'code' | 'nearby' | 'qr';
+
+/**
+ * Whether the connection is known to reach the device the user means:
+ *  checking    connected, the security code isn't ready yet
+ *  unverified  the user has to compare the code on both screens
+ *  changed     like unverified, but the other side claims to be a trusted device with another certificate
+ *  failed      the code exchange was tampered with: only disconnecting is offered
+ *  verified    codes matched, a trusted certificate, the 6-digit code pairing (PAKE), or the other device's QR was scanned here
+ * Files, texts and screen sharing wait for 'verified' (lib/transfer/manager).
+ */
+export type VerifyState = 'checking' | 'unverified' | 'changed' | 'failed' | 'verified';
+export type VerifiedBy = 'code' | 'trusted' | 'scan' | 'pairing';
 
 export interface SessionSnapshot {
   role: Role | null;
@@ -28,7 +44,22 @@ export interface SessionSnapshot {
   /** QR mode: our offer (host) or answer (joiner) payload to show as QR/text. */
   localCode: string | null;
   wasConnected: boolean;
+  /** The security code (lib/webrtc/verify), the same on both screens unless someone is in between. */
   pairingCode: string | null;
+  verify: VerifyState;
+  verifiedBy: VerifiedBy | null;
+  /** The other side has verified too (until then it refuses what we send). */
+  peerVerified: boolean;
+  /** 'changed': the trusted device it claims to be. Otherwise a trusted device with the same name, if any. */
+  lookalike: TrustedDevice | null;
+  /** The other device runs an older theShare without the security-code exchange. */
+  peerOutdated: boolean;
+  /** 'code' host: someone who knows the code asks to connect; the user accepts or declines. */
+  codeRequest: Requester | null;
+  /** 'code' host: wrong-code tries so far (the room closes at MAX_FAILED). */
+  codeFailures: number;
+  /** 'code' joiner: the host has our request and its user is being asked. */
+  awaitingApproval: boolean;
   transfers: TransferView[];
   /** Text/clipboard messages, oldest first. */
   messages: TextMessage[];
@@ -47,6 +78,14 @@ const initial: SessionSnapshot = {
   localCode: null,
   wasConnected: false,
   pairingCode: null,
+  verify: 'checking',
+  verifiedBy: null,
+  peerVerified: false,
+  lookalike: null,
+  peerOutdated: false,
+  codeRequest: null,
+  codeFailures: 0,
+  awaitingApproval: false,
   transfers: [],
   messages: [],
   autoAccept: false,
@@ -71,6 +110,14 @@ class Session {
   private peerLeft = false;
   private stopRendezvous: (() => void) | null = null;
   private expiryTimer: ReturnType<typeof setTimeout> | undefined;
+  /**
+   * Known before connecting that the other end is the right device: 'scan' when
+   * its QR came through our camera (it is the device in front of the user),
+   * 'pairing' when the connection codes came sealed with the PAKE key of the
+   * 6-digit code (whoever it is knows the code).
+   */
+  private preVerified: VerifiedBy | null = null;
+  private resolveRequest: ((accept: boolean) => void) | null = null;
   link: PeerLink | null = null;
   manager: TransferManager | null = null;
   onRecord: (record: TransferRecord, context: RecordContext) => void = () => {};
@@ -105,9 +152,26 @@ class Session {
     rooms.remember(code, 'host');
     this.set({ pairCode: code });
     this.stopRendezvous = hostWithCode(code, {
+      onRequest: (from) =>
+        new Promise<boolean>((resolve) => {
+          this.resolveRequest = resolve;
+          this.set({ codeRequest: from });
+        }),
       onOffer: async (offer) => {
         this.detachLink()?.close(); // an earlier attempt that went nowhere
+        this.preVerified = 'pairing';
         return this.attachLink(new PeerLink({ remote: true })).acceptOffer(offer);
+      },
+      onFailedTry: (count) => this.set({ codeFailures: count }),
+      onLocked: () => {
+        // Not reopened from "recent rooms" either: someone may be guessing it.
+        rooms.forget(code);
+        this.reset({
+          role: 'host',
+          method: 'code',
+          linkState: 'failed',
+          error: `Kod ${MAX_FAILED} kez yanlış girildi. Biri tahmin ediyor olabilir; güvenliğiniz için oda kapatıldı. Yeni bir kod oluşturun.`,
+        });
       },
       onError: (message) => this.set({ linkState: 'failed', error: message }),
     });
@@ -126,8 +190,10 @@ class Session {
     const link = this.attachLink(new PeerLink({ remote: true }));
     try {
       const offer = await link.createOffer();
-      const answer = await joinWithCode(code, offer);
+      const { name, kind, os } = selfDevice();
+      const answer = await joinWithCode(code, offer, { name, kind, os }, { onWaitingApproval: () => this.link === link && this.set({ awaitingApproval: true }) });
       if (this.link !== link) return null;
+      this.preVerified = 'pairing';
       await link.acceptAnswer(answer);
       return null;
     } catch (e) {
@@ -179,20 +245,26 @@ class Session {
     }
   }
 
-  /** Host: apply the answer. Returns a user-facing error, or null on success. */
-  async submitAnswer(text: string): Promise<string | null> {
+  /**
+   * Host: apply the answer. Returns a user-facing error, or null on success.
+   * `scanned`: read by our camera from the other screen, not pasted or relayed.
+   */
+  async submitAnswer(text: string, { scanned = false } = {}): Promise<string | null> {
     if (!this.link) return 'Oturum bulunamadı. Baştan başlayın.';
     try {
       await this.link.acceptAnswer(text);
+      if (scanned) this.preVerified = 'scan';
+      this.judge(); // in case the connection came up first
       return null;
     } catch (e) {
       return e instanceof Error ? e.message : 'Yanıt kodu uygulanamadı.';
     }
   }
 
-  /** Joiner: apply the offer and create the answer. Returns a user-facing error, or null. */
-  async startJoin(offerText: string): Promise<string | null> {
+  /** Joiner: apply the offer and create the answer. Returns a user-facing error, or null. See submitAnswer for `scanned`. */
+  async startJoin(offerText: string, { scanned = false } = {}): Promise<string | null> {
     this.reset({ role: 'join', method: 'qr' });
+    if (scanned) this.preVerified = 'scan';
     const link = this.attachLink(new PeerLink());
     try {
       const code = await link.acceptOffer(offerText);
@@ -230,6 +302,20 @@ class Session {
   rejoinRoom(code: string, role: Role): void {
     if (role === 'host') this.startCodeHost(code);
     else this.reset({ role: 'join', method: 'code', pairCode: code });
+  }
+
+  /** 'code' host: the user's answer to the connection request. */
+  answerCodeRequest(accept: boolean): void {
+    const from = this.state.codeRequest;
+    this.resolveRequest?.(accept);
+    this.resolveRequest = null;
+    this.set({ codeRequest: null, ...(accept && from ? { peerName: from.name } : {}) });
+  }
+
+  /** The user saw the same security code on both screens. */
+  confirmCode(): void {
+    const { verify, pairingCode } = this.state;
+    if (pairingCode && (verify === 'unverified' || verify === 'changed')) this.markVerified('code');
   }
 
   setAutoAccept(on: boolean): void {
@@ -274,6 +360,9 @@ class Session {
     this.manager = null;
     this.detachLink()?.close();
     this.peerLeft = false;
+    this.preVerified = null;
+    this.resolveRequest?.(false);
+    this.resolveRequest = null;
     this.set({ ...initial, ...patch });
   }
 
@@ -300,7 +389,10 @@ class Session {
         manager.saveFolder = () => this.saveFolder();
         manager.onChange = (transfers) => this.set({ transfers });
         manager.onText = (message) => this.set({ messages: [...this.state.messages, message] });
-        manager.onPeerInfo = (peer) => this.set({ peerName: peer.name, peer });
+        manager.onPeerInfo = (peer) => {
+          this.set({ peerName: peer.name, peer });
+          this.judge();
+        };
         manager.onRecord = (record) => {
           const { peer, peerName, method } = this.state;
           this.onRecord(record, { peer, peerName, method });
@@ -313,9 +405,7 @@ class Session {
         this.set({ linkState, error, wasConnected: true });
         const { method, role, pairCode } = this.state;
         if (method === 'code' && role && pairCode) rooms.remember(pairCode, role);
-        void pairingCode(link.localSdp, link.remoteSdp).then((code) => {
-          if (this.link === link) this.set({ pairingCode: code });
-        });
+        this.startVerification(link, manager);
         return;
       }
       if (linkState === 'failed' && this.state.wasConnected) {
@@ -328,6 +418,61 @@ class Session {
       this.set({ linkState, error });
     };
     return link;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Verification (lib/webrtc/verify, lib/storage/trusted)
+  // ---------------------------------------------------------------------------
+
+  private startVerification(link: PeerLink, manager: TransferManager): void {
+    const local = link.localFingerprint;
+    const remote = link.remoteFingerprint;
+    // Every browser SDP has a fingerprint; without one there is nothing to verify against.
+    if (!local || !remote) return this.set({ verify: 'failed' });
+    const current = () => this.manager === manager;
+    const exchange = new SasExchange(local, remote, (msg) => manager.sendSas(msg));
+    exchange.onCode = (code) => {
+      if (!current()) return;
+      this.set({ pairingCode: code });
+      this.judge();
+    };
+    exchange.onFail = () => current() && this.set({ verify: 'failed' });
+    manager.onSas = (msg) => void exchange.handle(msg);
+    manager.onHello = (version) => {
+      if (current() && version < PROTOCOL_VERSION) this.set({ peerOutdated: true });
+    };
+    manager.onPeerVerified = () => current() && this.set({ peerVerified: true });
+    void exchange.start();
+    this.judge();
+  }
+
+  /** Re-evaluates the verification state as the fingerprint, hello and code come in. */
+  private judge(): void {
+    const { link, manager } = this;
+    const fingerprint = link?.remoteFingerprint;
+    if (!manager || !fingerprint) return;
+    const { verify, peer, pairingCode } = this.state;
+    if (verify === 'failed') return;
+    if (verify === 'verified') {
+      // Its hello may come after the verification: keep its current name in the list.
+      if (peer) trusted.trust(fingerprint, peer);
+      return;
+    }
+    if (this.preVerified) return this.markVerified(this.preVerified);
+    const judgement = judgeTrust(trusted.getSnapshot(), fingerprint, peer);
+    if (judgement.kind === 'known') return this.markVerified('trusted');
+    this.set({
+      verify: judgement.kind === 'changed' ? 'changed' : pairingCode ? 'unverified' : 'checking',
+      lookalike: judgement.kind === 'changed' ? judgement.device : (judgement.sameName ?? null),
+    });
+  }
+
+  private markVerified(by: VerifiedBy): void {
+    const fingerprint = this.link?.remoteFingerprint;
+    if (!this.manager || !fingerprint) return;
+    trusted.trust(fingerprint, this.state.peer);
+    this.set({ verify: 'verified', verifiedBy: by, lookalike: null });
+    this.manager.setVerified();
   }
 }
 

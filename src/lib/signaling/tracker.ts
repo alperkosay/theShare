@@ -25,8 +25,14 @@ export interface Room {
   key: CryptoKey;
 }
 
-/** Derives the swarm id and AES key from a shared secret (code, network id, …). */
-export async function deriveRoom(secret: string, purpose = 'code'): Promise<Room> {
+/**
+ * Derives the swarm id and AES key from a shared value (the network id for
+ * nearby devices). The swarm id is public, so a guessable value is given away
+ * by it: fine for the network id (the public IP, which the tracker sees
+ * anyway), not for a 6-digit code, which uses a PAKE instead
+ * (lib/signaling/code-rendezvous).
+ */
+export async function deriveRoom(secret: string, purpose: string): Promise<Room> {
   const enc = new TextEncoder();
   const base = await crypto.subtle.importKey('raw', enc.encode(secret), 'PBKDF2', false, ['deriveBits']);
   const bits = new Uint8Array(

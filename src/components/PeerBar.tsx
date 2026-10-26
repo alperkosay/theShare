@@ -1,10 +1,11 @@
 import { useSession } from '../hooks/useSession';
 import { deviceLabel } from '../lib/device';
 import { DeviceIcon, Icon } from './Icon';
+import { VerifyBadge } from './Verify';
 
 /** Compact "who am I connected to" bar shown on top of the Files and Clipboard tabs. */
 export function PeerBar({ onOpen }: { onOpen: () => void }) {
-  const { linkState, peerName, peer, pairingCode } = useSession();
+  const { linkState, peerName, peer } = useSession();
   const connected = linkState === 'connected';
   return (
     <button type="button" className={`glass peer-bar${connected ? '' : ' off'}`} onClick={onOpen}>
@@ -21,12 +22,7 @@ export function PeerBar({ onOpen }: { onOpen: () => void }) {
           {connected ? 'Bağlı' : 'Bağlantı koptu'}
         </span>
       </span>
-      {connected && pairingCode && (
-        <span className="sec-code" title="Güvenlik kodu: iki ekranda aynı olmalı">
-          <Icon name="shield" />
-          <strong data-testid="pairing-code">{pairingCode}</strong>
-        </span>
-      )}
+      <VerifyBadge />
     </button>
   );
 }

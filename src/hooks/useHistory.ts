@@ -9,10 +9,12 @@ import {
 } from '../lib/storage/history';
 import { handleOf, recordOf, resolveRecord, type ResolveResult } from '../lib/storage/resend';
 import type { TransferRecord } from '../lib/transfer/manager';
+import { forgetDeviceCertificate, loadDeviceCertificate } from '../lib/webrtc/identity';
 import { profile } from './useProfile';
 import { rooms } from './useRooms';
 import { saving } from './useSaving';
 import { session, type RecordContext } from './useSession';
+import { trusted } from './useTrusted';
 
 /** Files waiting for a connection (or for the current send to finish). In memory only. */
 export interface PendingSend {
@@ -256,10 +258,17 @@ export function useHistory(): HistorySnapshot {
   return useSyncExternalStore(history.subscribe, history.getSnapshot);
 }
 
-/** "Reset everything": history, stored files, recent rooms, save folder, name, device id and settings. */
+/**
+ * "Reset everything": history, stored files, recent rooms, save folder, name,
+ * device id, settings, trusted devices and this device's certificate (a new
+ * identity: devices that trusted this one will have to verify it again).
+ */
 export async function resetEverything(): Promise<void> {
   history.forgetAll();
   saving.forget();
   rooms.clear();
+  trusted.forgetAll();
+  forgetDeviceCertificate();
   await profile.reset();
+  await loadDeviceCertificate();
 }

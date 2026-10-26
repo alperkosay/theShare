@@ -17,6 +17,12 @@
  *                          ◀──     complete {id}
  *   cancel {id} may be sent by either side at any time.
  *
+ * Right after the hello both sides run the security-code exchange
+ * (sas-commit, sas-reveal; lib/webrtc/verify) and send `verified` once their
+ * side has verified the connection (the user compared the codes, a trusted
+ * fingerprint, a QR scan). Until then nothing but these messages is accepted
+ * (lib/transfer/manager).
+ *
  * Screen sharing (lib/webrtc/media) adds media tracks to the same connection;
  * the renegotiation that needs (sdp, ice), the share's state (screen,
  * screen-ask, screen-no) and drawings on it (ink, point; lib/ink) travel as
@@ -25,8 +31,10 @@
 
 import { cleanPeerName, parseDeviceType, type DeviceKind, type DeviceOs } from '../device';
 import { parseStroke, type Stroke } from '../ink';
+import { isHex64, type SasMessage } from '../webrtc/verify';
 
-export const PROTOCOL_VERSION = 1;
+/** 2: security-code exchange and the verification gate. Version 1 peers can't pass the gate. */
+export const PROTOCOL_VERSION = 2;
 export const MAX_FILES_PER_TRANSFER = 500;
 const MAX_CONTROL_LENGTH = 512 * 1024;
 const MAX_NAME_LENGTH = 255;
@@ -57,6 +65,9 @@ export type ControlMessage =
   | { t: 'complete'; id: string }
   | { t: 'cancel'; id: string; reason?: string }
   | { t: 'bye' }
+  | SasMessage
+  /** The sender's side considers the connection verified (informational: each side enforces its own gate). */
+  | { t: 'verified' }
   | MediaMessage;
 
 export type MediaMessage =
@@ -147,6 +158,12 @@ export function parseControl(text: string): ControlMessage | null {
       return isId(m.id) && isCount(m.bytes) ? { t: 'ack', id: m.id, bytes: m.bytes } : null;
     case 'bye':
       return { t: 'bye' };
+    case 'sas-commit':
+      return isHex64(m.c) ? { t: 'sas-commit', c: m.c } : null;
+    case 'sas-reveal':
+      return isHex64(m.n) ? { t: 'sas-reveal', n: m.n } : null;
+    case 'verified':
+      return { t: 'verified' };
     case 'sdp':
       return (m.type === 'offer' || m.type === 'answer') && typeof m.sdp === 'string' && m.sdp.length <= MAX_MEDIA_SDP_LENGTH
         ? { t: 'sdp', type: m.type, sdp: m.sdp }

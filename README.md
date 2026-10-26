@@ -65,10 +65,13 @@ Kodla bağlanmada STUN açıktır, bu yüzden cihazlar farklı ağlarda olabilir
 
 Bizim bir sunucumuz yok. WebTorrent tracker'ları, tarayıcıların birbirini bulması için zaten var olan, herkese açık ücretsiz "buluşma noktaları"dır. İşleyiş şöyle:
 
-1. Koddan bir oda kimliği ve bir şifreleme anahtarı türetilir (PBKDF2).
-2. İki cihaz aynı odaya katılır.
-3. Bağlantı bilgisi (SDP) AES-GCM ile şifrelenip tracker üzerinden karşıya iletilir.
-4. Bundan sonra tracker devreden çıkar.
+1. Odayı kodun yalnızca **ilk hanesi** belirler (10 oda). Kalan 5 hane cihazdan hiç çıkmaz.
+2. İki cihaz, tracker üzerinden bir **PAKE** (CPace, ristretto255) yürütür ([pake.ts](src/lib/signaling/pake.ts)). Koddan güçlü bir ortak anahtar çıkar. Tracker'daki trafiği kaydeden biri bu kayıttan kodu deneme yanılmayla bulamaz.
+3. Kodu giren taraf kodu bildiğini kanıtlar. Kodu oluşturan cihazda "X kodunuzla bağlanmak istiyor: Kabul et / Reddet" sorusu çıkar.
+4. Bağlantı bilgisi (SDP) bu anahtarla şifrelenip doğrulanarak iletilir. Bağlantı kendiliğinden **doğrulanmış** sayılır, güvenlik kodunu karşılaştırmak gerekmez.
+5. Bundan sonra tracker devreden çıkar.
+
+Kodu bilmeyen biri bağlantıya girmeye çalışırsa her denemede yalnızca tek bir tahmin hakkı olur (100 000'de 1). Kodu oluşturan taraf yanlış denemeyi görür. 3 yanlış denemeden sonra oda kapanır.
 
 [code-rendezvous.ts](src/lib/signaling/code-rendezvous.ts) şu tracker'ları aynı anda kullanır, ilk yanıt veren kazanır:
 
@@ -140,13 +143,16 @@ Ana ekrandaki **Sıfır bağlantı** kartı, iki cihaz arasında **hiçbir bağl
 ## Güvenlik ve gizlilik
 
 - **Şifreleme:** Dosyalar WebRTC'nin DTLS şifrelemesiyle doğrudan karşı cihaza gider. Hiçbir sunucuya yüklenmez.
-- **6 haneli kod güçlü bir kimlik doğrulama değildir.** Bir milyon olasılık tahminle denenebilir. Asıl koruma iki şey:
-  - Bağlandıktan sonra iki ekranda görünen **güvenlik kodu**. Bu kod, iki tarafın DTLS sertifikalarından türetilir; farklıysa araya biri girmiştir.
-  - Her aktarım için **alıcı onayı**.
-- **Tracker'lar ne görür?** Şifreli bağlantı bilgisini ve WebSocket bağlantısından gelen IP adresinizi görür. Şifreleme, bağlantı bilgisindeki yerel adreslerin sıradan bir gözlemci tarafından okunmasını engeller. Ancak kodu deneme yanılmayla bulan biri şifreyi çözebilir. Hiçbir dış hizmet istemiyorsanız QR yöntemini kullanın.
+- **Bağlantı doğrulaması:** Bağlandıktan sonra iki ekranda 12 haneli bir **güvenlik kodu** görünür (`482 913 076 551`). Kodlar aynıysa arada kimse yoktur. Doğrulanana kadar dosya, metin ve ekran paylaşımı **iki yönde de kapalıdır**. Ayrıntılar [verify.ts](src/lib/webrtc/verify.ts):
+  - Kod, iki cihazın DTLS sertifika parmak izlerinden ve bağlantı başına üretilen rastgele değerlerden türetilir. Rastgele değerler şifreli kanalda önce taahhüt edilip sonra açıklanır (ZRTP'deki yöntem). Araya giren biri iki ekranda aynı kodu ancak 2⁴⁰'ta bir şansla tutturabilir.
+  - Her cihazın kalıcı bir sertifikası vardır ([identity.ts](src/lib/webrtc/identity.ts)); özel anahtarı tarayıcıdan dışarı çıkarılamaz. Kodu bir kez karşılaştırılan cihaz **güvenilen cihazlar** listesine girer. Sonraki bağlantılarda kendiliğinden doğrulanır. Liste profil ayarlarındadır.
+  - Güvenilen bir cihazın kimliğiyle ama farklı bir sertifikayla gelen bağlantı kırmızı uyarı gösterir. Cihaz sıfırlanmış ya da biri onun yerine geçiyor olabilir.
+  - QR'ı uygulamanın kendi tarayıcısıyla okutan taraf, karşı ekrandaki cihaza bağlandığını bilir; o taraf kendiliğinden doğrulanır. Yapıştırılan ya da bağlantıyla açılan kodlar doğrulama ister.
+- **6 haneli kodun gücü:** Kod PAKE ile kullanılır, bu yüzden kaydedilmiş trafikten kırılamaz. Aktif bir saldırganın her denemede 100 000'de 1 şansı vardır; oda 3 yanlış denemede kapanır. Bu, magic-wormhole'un varsayılan koduyla aynı sınıftır. Daha güçlü güvence isteyenler bağlandıktan sonra güvenlik kodunu yine karşılaştırabilir. Her aktarım ayrıca **alıcı onayı** bekler.
+- **Tracker'lar ne görür?** Kodla bağlanırken: kodun ilk hanesini (oda), rastgele görünen PAKE mesajlarını, şifreli bağlantı bilgisini ve WebSocket bağlantısından gelen IP adresinizi görür. Bağlantı bilgisini, cihaz adını ve kodun kalanını göremez. Yakındaki cihazlarda: aynı genel IP'yi paylaşanlar odayı hesaplayabilir; ayrıntılar [Yakındaki cihazlar](#yakındaki-cihazlar-internet-gerekir) bölümünde. Hiçbir dış hizmet istemiyorsanız QR yöntemini kullanın.
 - **Dosya içeriği ve adları:** Gönderenin beyan ettiği dosya türüne güvenilmez; indirmeler `application/octet-stream` olarak verilir. Dosya adları temizlenir (yol ayraçları, kontrol karakterleri, Windows'a ayrılmış adlar).
-- **Bu cihazda saklanan veriler:** Kullanıcı adı, kalıcı cihaz kimliği, ayarlar, geçmiş ve yeniden gönderme için dosya tutamaçları/kopyaları tarayıcının IndexedDB'sinde, **yalnızca bu cihazda** tutulur. Hiçbir sunucuya gönderilmez; karşı cihaza yalnızca ad, cihaz türü ve kalıcı cihaz kimliği gider (bağlantı kurulduktan sonra). Geçmiş ve dosya saklama ayarlardan kapatılabilir; "Geçmişi temizle", "Saklanan dosyaları sil" ve "Her şeyi sıfırla" tek dokunuşla siler. Tarayıcının veriyi kendiliğinden silmemesi için `navigator.storage.persist()` istenir. Gelen dosyaların geçici kopyaları oturum bitince yine silinir.
-- **Ad bir kimlik doğrulaması değildir.** Herkes kendine "Annem" adını verebilir; kalıcı cihaz kimliği de karşı tarafın beyanıdır. Asıl güvence güvenlik kodu ve alıcı onayıdır. Gelen adlardan kontrol ve yön değiştirme (bidi) karakterleri temizlenir.
+- **Bu cihazda saklanan veriler:** Kullanıcı adı, kalıcı cihaz kimliği, cihaz sertifikası, güvenilen cihazlar, ayarlar, geçmiş ve yeniden gönderme için dosya tutamaçları/kopyaları tarayıcının IndexedDB'sinde, **yalnızca bu cihazda** tutulur. Hiçbir sunucuya gönderilmez; karşı cihaza yalnızca ad, cihaz türü ve kalıcı cihaz kimliği gider (bağlantı kurulduktan sonra). Geçmiş ve dosya saklama ayarlardan kapatılabilir; "Geçmişi temizle", "Saklanan dosyaları sil" ve "Her şeyi sıfırla" tek dokunuşla siler. Tarayıcının veriyi kendiliğinden silmemesi için `navigator.storage.persist()` istenir. Gelen dosyaların geçici kopyaları oturum bitince yine silinir.
+- **Ad bir kimlik doğrulaması değildir.** Herkes kendine "Annem" adını verebilir; kalıcı cihaz kimliği de karşı tarafın beyanıdır. Cihazı tanıtan adı değil sertifikasıdır; bunu güvenlik kodu ve "Doğrulanmış" rozeti gösterir. Gelen adlardan kontrol ve yön değiştirme (bidi) karakterleri temizlenir.
 - **Dış kaynaklar:** Analiz/izleme, harici font ve CDN yoktur. CSP yalnızca kendi adresimize ve yukarıdaki tracker'lara bağlantıya izin verir.
 
 ## Ağ kısıtları
@@ -178,10 +184,14 @@ src/
   components/                     QrCode, QrScanner, CodeEntry, TransferCard, Diagnostics…
   hooks/useSession.ts             bağlantı + aktarım yaşam döngüsü
   lib/signaling/tracker.ts        tracker bağlantıları, oda türetme, şifreleme
-  lib/signaling/code-rendezvous.ts  6 haneli kod
+  lib/signaling/code-rendezvous.ts  6 haneli kod: oda, PAKE akışı, yanlış deneme sınırı
+  lib/signaling/pake.ts           CPace (ristretto255, @noble/curves)
   lib/signaling/nearby.ts         yakındaki cihazlar (genel IP → oda)
   lib/webrtc/peer.ts              RTCPeerConnection, ICE, zaman aşımları
   lib/webrtc/signal-codec.ts      SDP küçültme + doğrulama
+  lib/webrtc/identity.ts          kalıcı cihaz sertifikası (DTLS kimliği)
+  lib/webrtc/verify.ts            güvenlik kodu: taahhüt/açıklama değiş tokuşu
+  lib/storage/trusted.ts          güvenilen cihazlar; components/Verify.tsx doğrulama ekranı
   lib/webrtc/media.ts             ekran paylaşma: veri kanalı üzerinden yeniden anlaşma (perfect negotiation), kalite, istatistik
   hooks/useScreenShare.ts         ekran paylaşma durumu (paylaşım, izleme, istekler)
   lib/ink.ts, hooks/useInk.ts     ekran üzerine çizim: şekiller, doğrulama, çizdirme; iki taraf arası eşitleme
@@ -196,7 +206,7 @@ src/
   hooks/useProfile.ts, useHistory.ts  profil; geçmiş + bekleyenler
 ```
 
-**Çalışma zamanı bağımlılıkları:** `react`, `react-dom`, `uqr`, `barcode-detector` + `zxing-wasm`, `workbox-window`.
+**Çalışma zamanı bağımlılıkları:** `react`, `react-dom`, `uqr`, `barcode-detector` + `zxing-wasm`, `workbox-window`, `@noble/curves` (denetlenmiş eliptik eğri kütüphanesi, PAKE için).
 
 ## Test durumu
 

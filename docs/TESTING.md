@@ -43,7 +43,11 @@ Asıl risk mDNS çözümlemesi; diğer testlere geçmeden önce bunu doğrulayı
 | 1a.4 | Biri Wi-Fi, diğeri mobil veride | Çoğu durumda bağlanır; operatöre göre başarısız olabilir. Sonucu ve operatörü not edin |
 | 1a.4b | İki telefon da mobil veride (farklı operatörler) | Sonucu not edin; TURN olmadığı için başarısız olabilir |
 | 1a.4c | Farklı evlerdeki iki bilgisayar | Bağlanır |
-| 1a.5 | Bağlandıktan sonra iki ekrandaki "Güvenlik kodu"nu karşılaştırın | Aynı |
+| 1a.5 | Kodu girin | Kodu oluşturan cihazda "… kodunuzla bağlanmak istiyor" çıkar; kabul edince bağlanır, iki taraf da "Doğrulanmış" (soru sorulmaz). İki ekrandaki 12 haneli güvenlik kodu aynı |
+| 1a.5b | Kodun ilk hanesi doğru, kalanı yanlış | Katılanda "Kod yanlış"; oluşturanda "yanlış kodla denedi (1/3)". 3. denemede oda kapanır |
+| 1a.6 | Aynı iki cihaz yeniden bağlansın | Soru sorulmaz, ikisi de "Doğrulanmış" |
+| 1a.7 | Bir cihazda "Her şeyi sıfırla", sonra yeniden bağlanın | Diğer cihaz kodu yeniden sorar (yeni kimlik) |
+| 1a.8 | Safari ve Firefox'ta sayfayı yenileyip aynı cihaza yeniden bağlanın | Doğrulanmış kalır (sertifika IndexedDB'de saklanabiliyor mu; sonucu not edin) |
 
 ## 1b. ZIP ve sürükle-bırak
 

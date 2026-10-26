@@ -36,6 +36,8 @@
   --ok: #2e8b57;
   --error: #d1394a;
   --error-bg: var(--rose);
+  /* An "off" switch track: clearly a control on any card, its white knob still standing out. */
+  --track: rgb(0 0 0 / 16%);
   --shadow: 0 0 0 0.5px rgb(0 0 0 / 3%), 0 1px 2px rgb(0 0 0 / 4%), 0 6px 16px -4px rgb(0 0 0 / 6%), 0 18px 36px -18px rgb(0 0 0 / 12%);
   --veil: rgb(0 0 0 / 28%);
   --radius: 24px;
@@ -58,6 +60,7 @@
   --ok: #7fd8a4;
   --error: #ff8a95;
   --error-bg: rgb(253 217 221 / 14%);
+  --track: rgb(255 255 255 / 24%);
   --shadow: none;
   --veil: rgb(0 0 0 / 55%);
 }
@@ -905,6 +908,103 @@ textarea {
   color: var(--ok);
 }
 
+/* --- verification (components/Verify) --- */
+
+.sec-code.unverified,
+.verify-strip {
+  background: var(--lemon);
+  color: var(--on-pastel);
+}
+
+.sec-code.unverified .icon,
+.hub-code.unverified .icon {
+  color: inherit;
+}
+
+.hub-code.unverified {
+  color: var(--error);
+}
+
+.hub-code {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 2px 6px;
+}
+
+.hub-code strong {
+  white-space: nowrap;
+}
+
+.verify-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px 8px 14px;
+  border-radius: 18px;
+  font-size: 0.9rem;
+  line-height: 1.3;
+}
+
+.verify-strip > .icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+
+.verify-strip.alarm {
+  background: var(--error-bg);
+  color: var(--error);
+}
+
+.verify-strip.waiting {
+  padding-right: 14px;
+  background: var(--glass-strong);
+  color: var(--text);
+}
+
+.verify-icon {
+  background: var(--lemon);
+  color: var(--on-pastel);
+}
+
+.verify-sheet.alarm .verify-icon {
+  background: var(--error-bg);
+  color: var(--error);
+}
+
+.verify-sheet.alarm h2 {
+  color: var(--error);
+}
+
+.sas-code {
+  margin: 6px 0;
+  padding: 12px 18px;
+  border-radius: 18px;
+  background: var(--glass-strong);
+  font-size: clamp(1.35rem, 6.5vw, 1.75rem);
+  letter-spacing: 0.04em;
+  word-spacing: 0.25em;
+  white-space: nowrap;
+}
+
+.trusted-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.trusted-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+}
+
 /* --- empty / failed states --- */
 
 .empty,
@@ -1001,7 +1101,7 @@ textarea {
   width: 38px;
   height: 22px;
   border-radius: 999px;
-  background: var(--glass-strong);
+  background: var(--track);
   transition: background 0.3s var(--ease);
 }
 
@@ -1445,6 +1545,40 @@ textarea {
 
 .toast span {
   flex: 1;
+}
+
+/* Forced update (components/UpdatePrompt): covers everything, above sheets too. */
+.update-screen {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: max(24px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+  background: var(--bg);
+  animation: fade 0.3s ease both;
+}
+
+.update-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: min(100%, 420px);
+  text-align: center;
+}
+
+.update-card h1 {
+  margin: 4px 0 0;
+}
+
+.update-card p {
+  margin: 0 0 8px;
+}
+
+.update-icon {
+  background: var(--sky);
+  color: var(--on-pastel);
 }
 
 /* --- profile & settings --- */
@@ -4661,4 +4795,51 @@ kbd {
 .app.busy .dropzone-icon,
 .app.busy .beam span {
   animation-play-state: paused;
+}
+
+/*
+ * Verification strip and badge (components/Verify), after the themes: their
+ * pastel/alarm colours must win over the themes' generic button and well styles.
+ */
+:root .verify-strip .btn {
+  min-height: 32px;
+  border-color: transparent;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+  color: inherit;
+  box-shadow: none;
+}
+
+:root .sec-code.unverified {
+  background: var(--lemon);
+  color: var(--on-pastel);
+  box-shadow: none;
+}
+
+/*
+ * Soft switches: a knob in the surface colour vanished into its pressed-in
+ * track. Off: a grey knob on an outlined track. On: a white knob on blue.
+ */
+:root[data-theme='soft'] .switch {
+  box-shadow: var(--inset), inset 0 0 0 1px rgb(0 0 0 / 10%);
+}
+
+:root[data-theme='soft'] .switch::after {
+  background: #a3adbf;
+  box-shadow: 1px 1px 3px var(--dark);
+}
+
+:root[data-theme='soft'] .check input:checked + .switch::after {
+  background: #ffffff;
+}
+
+:root[data-theme='soft']:where([data-scheme='dark']) .switch {
+  box-shadow: var(--inset), inset 0 0 0 1px rgb(255 255 255 / 14%);
+}
+
+:root[data-theme='soft']:where([data-scheme='dark']) .switch::after {
+  background: #8d96a8;
+}
+
+:root[data-theme='soft']:where([data-scheme='dark']) .check input:checked + .switch::after {
+  background: #f4f7fc;
 }

@@ -34,6 +34,16 @@ describe('parseControl', () => {
     for (const text of bad) expect(parseControl(text), text).toBeNull();
   });
 
+  it('accepts the security-code messages only with 32-byte hex values', () => {
+    const hex = 'ab'.repeat(32);
+    expect(parseControl(JSON.stringify({ t: 'sas-commit', c: hex }))).toEqual({ t: 'sas-commit', c: hex });
+    expect(parseControl(JSON.stringify({ t: 'sas-reveal', n: hex }))).toEqual({ t: 'sas-reveal', n: hex });
+    expect(parseControl('{"t":"verified"}')).toEqual({ t: 'verified' });
+    for (const bad of [{ t: 'sas-commit' }, { t: 'sas-commit', c: 'ab' }, { t: 'sas-reveal', n: 'AB'.repeat(32) }, { t: 'sas-reveal', n: 5 }]) {
+      expect(parseControl(JSON.stringify(bad)), JSON.stringify(bad)).toBeNull();
+    }
+  });
+
   it('accepts screen-sharing messages and bounds them', () => {
     expect(parseControl('{"t":"sdp","type":"offer","sdp":"v=0"}')).toEqual({ t: 'sdp', type: 'offer', sdp: 'v=0' });
     expect(parseControl('{"t":"ice","candidate":"candidate:1 1 udp 1 1.2.3.4 5 typ host","mid":"1","index":1}')).toEqual({

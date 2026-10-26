@@ -19,14 +19,14 @@ describe('pairing codes', () => {
 
 describe('room derivation and sealing', () => {
   it('derives the same room for the same code and a different one otherwise', async () => {
-    const [a, b, c] = await Promise.all([deriveRoom('123456'), deriveRoom('123456'), deriveRoom('123457')]);
+    const [a, b, c] = await Promise.all([deriveRoom('123456', 'nearby'), deriveRoom('123456', 'nearby'), deriveRoom('123457', 'nearby')]);
     expect(a.infoHash).toMatch(/^[0-9a-f]{20}$/);
     expect(a.infoHash).toBe(b.infoHash);
     expect(a.infoHash).not.toBe(c.infoHash);
   });
 
   it('round-trips sealed payloads and rejects foreign or tampered ones', async () => {
-    const [{ key }, { key: other }] = await Promise.all([deriveRoom('111111'), deriveRoom('222222')]);
+    const [{ key }, { key: other }] = await Promise.all([deriveRoom('111111', 'nearby'), deriveRoom('222222', 'nearby')]);
     const sealed = await seal(key, 'TS1.example');
     expect(await unseal(key, sealed)).toBe('TS1.example');
     expect(await unseal(other, sealed)).toBeNull();

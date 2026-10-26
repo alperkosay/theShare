@@ -5,7 +5,7 @@ import { BackButton, Failed, Waiting } from './common';
 
 /** @param initialCode code taken from the URL (…/#k=482913) when opened via the QR. */
 export function CodeJoinScreen({ initialCode }: { initialCode: string | null }) {
-  const { linkState, error } = useSession();
+  const { linkState, error, awaitingApproval } = useSession();
   const [value, setValue] = useState(initialCode ?? '');
   const [codeError, setCodeError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -38,7 +38,7 @@ export function CodeJoinScreen({ initialCode }: { initialCode: string | null }) 
     <div className="page">
       <BackButton />
       {busy ? (
-        <Waiting text="Bağlanılıyor…" />
+        <Waiting text={awaitingApproval ? 'Kod doğru. Diğer cihazın onayı bekleniyor…' : 'Bağlanılıyor…'} />
       ) : (
         <form
           className="stack"

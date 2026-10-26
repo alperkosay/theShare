@@ -10,14 +10,16 @@ import { Icon } from '../components/Icon';
 
 /** "Files" tab: pick or drop files to send; incoming offers, this session's transfers, the pending queue. */
 export function FilesTab({ onOpenDevices }: { onOpenDevices: () => void }) {
-  const { linkState, wasConnected, transfers } = useSession();
+  const { linkState, wasConnected, transfers, verify, peerVerified } = useSession();
   const inputRef = useRef<HTMLInputElement>(null);
   const [asZip, setAsZip] = useState(false);
   const [zipping, setZipping] = useState(false);
   const [dragging, setDragging] = useState(false);
   const connected = linkState === 'connected';
   const sending = zipping || transfers.some((t) => t.direction === 'out' && ['pending', 'active', 'finishing'].includes(t.status));
-  const canSend = connected && !sending;
+  // Nothing goes out before both sides have verified the connection (components/Verify).
+  const locked = connected && !(verify === 'verified' && peerVerified);
+  const canSend = connected && !sending && !locked;
 
   if (!wasConnected) {
     return (
@@ -93,8 +95,10 @@ export function FilesTab({ onOpenDevices }: { onOpenDevices: () => void }) {
             <span className="dropzone-icon">
               <Icon name="upload" />
             </span>
-            <strong>{zipping ? 'ZIP hazırlanıyor…' : sending ? 'Gönderim sürüyor…' : connected ? 'Dosya gönder' : 'Bağlantı yok'}</strong>
-            <span className="small muted">{connected ? 'Dokunun ya da dosyaları buraya bırakın' : 'Yeni gönderim için yeniden bağlanın'}</span>
+            <strong>{zipping ? 'ZIP hazırlanıyor…' : sending ? 'Gönderim sürüyor…' : locked ? 'Doğrulama bekleniyor' : connected ? 'Dosya gönder' : 'Bağlantı yok'}</strong>
+            <span className="small muted">
+              {locked ? 'Güvenlik kodu iki ekranda karşılaştırılınca açılır' : connected ? 'Dokunun ya da dosyaları buraya bırakın' : 'Yeni gönderim için yeniden bağlanın'}
+            </span>
           </button>
 
           <label className="check small muted">

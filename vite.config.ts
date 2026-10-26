@@ -45,7 +45,7 @@ export default defineConfig(({ mode }) => ({
       injectRegister: false,
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: 'theShare — P2P Dosya Paylaşımı',
+        name: 'theShare',
         short_name: 'theShare',
         description: 'Sunucusuz, cihazdan cihaza dosya paylaşımı (WebRTC + QR).',
         lang: 'tr',

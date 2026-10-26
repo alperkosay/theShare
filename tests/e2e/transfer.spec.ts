@@ -19,11 +19,29 @@ async function pasteCode(page: Page, code: string): Promise<void> {
   await page.getByTestId('code-submit').click();
 }
 
-async function expectConnected(host: Page, joiner: Page): Promise<void> {
+/** Both connected, showing the same security code. */
+async function expectSameCode(host: Page, joiner: Page): Promise<void> {
+  const codes: string[] = [];
   for (const page of [host, joiner]) {
     await expect(page.getByTestId('link-status')).toHaveAttribute('data-state', 'connected', { timeout: 30_000 });
+    const code = page.getByTestId('pairing-code').first();
+    await expect(code).toHaveText(/^\d{3} \d{3} \d{3} \d{3}$/);
+    codes.push(await code.innerText());
   }
-  await expect(host.getByTestId('pairing-code')).toHaveText(await joiner.getByTestId('pairing-code').innerText());
+  expect(codes[0]).toBe(codes[1]);
+}
+
+/** Connected and verified: compares the codes like a user would and confirms where asked (trusted devices aren't asked). */
+async function expectConnected(host: Page, joiner: Page): Promise<void> {
+  await expectSameCode(host, joiner);
+  for (const page of [host, joiner]) {
+    const confirm = page.getByTestId('sas-confirm');
+    if (await confirm.isVisible()) await confirm.click();
+  }
+  for (const page of [host, joiner]) {
+    await expect(page.getByTestId('verify-badge').first()).toHaveAttribute('data-verify', 'verified');
+    await expect(page.getByTestId('verify-strip')).toHaveCount(0);
+  }
 }
 
 /** Clicks a QR button on the home screen; while nearby discovery works, that card hides behind a link. */
@@ -39,7 +57,7 @@ async function clickQr(page: Page, testId: 'qr-host' | 'qr-join'): Promise<void>
  * Pairs two pages with the offline QR flow (codes pasted as text). No internet needed.
  * `reload: false` keeps the host page as it is (e.g. to keep its in-memory pending queue).
  */
-async function pair(host: Page, joiner: Page, { reload = true } = {}): Promise<void> {
+async function pair(host: Page, joiner: Page, { reload = true, verify = true } = {}): Promise<void> {
   if (reload) await host.goto('/');
   else await host.getByTestId('tab-devices').click();
   await clickQr(host, 'qr-host');
@@ -51,7 +69,8 @@ async function pair(host: Page, joiner: Page, { reload = true } = {}): Promise<v
   const answer = await readCode(joiner, /^TS[1Z]\./);
 
   await pasteCode(host, answer);
-  await expectConnected(host, joiner);
+  if (verify) await expectConnected(host, joiner);
+  else await expectSameCode(host, joiner);
 }
 
 async function twoDevices(browserA: Browser, browserB: Browser = browserA) {
@@ -96,6 +115,8 @@ test('Chromium ↔ Chromium: pair via text, send several files incl. empty and l
 
 test('text messages arrive as bubbles; peers show each other\'s name and OS', async ({ browser }) => {
   const host = await (await browser.newContext({ userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148' })).newPage();
+  // On "iOS" the install suggestion opens 1.2 s into the first visit; on a slow run it would cover the QR button.
+  await host.addInitScript(() => localStorage.setItem('theshare-install-seen', '1'));
   const joiner = await (await browser.newContext()).newPage();
   await pair(host, joiner);
 
@@ -152,6 +173,41 @@ test('cancel mid-transfer and disconnect are reported on the other side', async 
   await expect(host.getByTestId('link-status')).toHaveAttribute('data-state', 'failed', { timeout: 30_000 });
 });
 
+test('nothing moves before the security code is confirmed; a verified device is trusted next time', async ({ browser }) => {
+  const { a: host, b: joiner } = await twoDevices(browser);
+  await pair(host, joiner, { verify: false });
+
+  // Codes pasted as text could have been swapped on the way: both sides are asked to compare.
+  for (const page of [host, joiner]) {
+    await expect(page.getByTestId('verify-sheet')).toHaveAttribute('data-verify', 'unverified');
+    await expect(page.getByTestId('sas-code')).toHaveText(await page.getByTestId('pairing-code').first().innerText());
+  }
+  await host.getByRole('button', { name: 'Sonra' }).click();
+  await expect(host.getByTestId('verify-strip')).toContainText('doğrulanmadı');
+  await host.getByTestId('file-input').setInputFiles({ name: 'erken.txt', mimeType: 'text/plain', buffer: Buffer.from('x') });
+  await expect(host.locator('[data-testid=transfer]')).toHaveCount(0);
+
+  // One side confirms: the other still blocks, and says so.
+  await joiner.getByTestId('sas-confirm').click();
+  await expect(joiner.getByTestId('verify-strip')).toContainText('doğrulayınca');
+  await host.getByTestId('verify-strip').getByRole('button', { name: 'Doğrula' }).click();
+  await host.getByTestId('sas-confirm').click();
+  await expect(host.getByTestId('verify-strip')).toHaveCount(0);
+  await transferFiles(host, joiner, [{ name: 'dogrulandi.txt', buffer: Buffer.from('doğrulandı') }]);
+
+  // Next time they recognise each other's certificate: no question, verified right away.
+  await host.getByTestId('tab-devices').click();
+  await host.getByTestId('leave').click();
+  await pair(host, joiner, { verify: false });
+  for (const page of [host, joiner]) {
+    await expect(page.getByTestId('verify-badge').first()).toHaveAttribute('data-verify', 'verified');
+    await expect(page.getByTestId('verify-sheet')).toHaveCount(0);
+  }
+  await host.getByTestId('tab-history').click();
+  await host.getByTestId('profile-chip').click();
+  await expect(host.getByTestId('trusted-device')).toHaveCount(1);
+});
+
 test('invalid and mismatched codes show a clear error', async ({ page }) => {
   await page.goto('/');
   await clickQr(page, 'qr-join');
@@ -174,6 +230,12 @@ test('opening the offer link directly starts joining', async ({ browser }) => {
   expect(new URL(joiner.url()).hash).toBe(''); // single-use code removed from the address bar
 });
 
+/** The code host is asked who is connecting (they proved they know the code). */
+async function acceptCodeRequest(host: Page): Promise<void> {
+  await expect(host.getByTestId('code-request')).toContainText('kodunuzla bağlanmak istiyor', { timeout: 30_000 });
+  await host.getByTestId('code-accept').click();
+}
+
 // These use the public WebTorrent trackers, so they need internet access.
 test.describe('6-digit code pairing (public trackers)', () => {
   test.describe.configure({ retries: 1 });
@@ -188,7 +250,11 @@ test.describe('6-digit code pairing (public trackers)', () => {
     await joiner.goto('/');
     await joiner.getByTestId('start-join').click();
     await joiner.getByTestId('pair-code-input').fill(`${code.slice(0, 3)} ${code.slice(3)}`); // connects on the 6th digit
+    await expect(joiner.getByText('Diğer cihazın onayı bekleniyor')).toBeVisible({ timeout: 30_000 });
+    await acceptCodeRequest(host);
     await expectConnected(host, joiner);
+    // The PAKE already proved both sides know the code: nobody is asked to compare.
+    for (const page of [host, joiner]) await expect(page.getByTestId('verify-badge').first()).toHaveAttribute('title', /6 haneli kodla/);
     await transferFiles(joiner, host, [{ name: 'kodla.txt', buffer: Buffer.from('6 haneli kod çalışıyor') }]);
   });
 
@@ -198,7 +264,20 @@ test.describe('6-digit code pairing (public trackers)', () => {
     await host.getByTestId('start-host').click();
     const link = await readCode(host, /#k=\d{6}$/);
     await joiner.goto(link.replace(/^https?:\/\/[^/]+/, ''));
+    await acceptCodeRequest(host);
     await expectConnected(host, joiner);
+  });
+
+  test('the host can turn a request down', async ({ browser }) => {
+    const { a: host, b: joiner } = await twoDevices(browser);
+    await host.goto('/');
+    await host.getByTestId('start-host').click();
+    const link = await readCode(host, /#k=\d{6}$/);
+    await joiner.goto(link.replace(/^https?:\/\/[^/]+/, ''));
+    await expect(host.getByTestId('code-request')).toBeVisible({ timeout: 30_000 });
+    await host.getByTestId('code-decline').click();
+    await expect(joiner.getByRole('alert')).toContainText('kabul etmedi', { timeout: 20_000 });
+    await expect(host.getByTestId('pair-code')).toBeVisible(); // still waiting for the right one
   });
 
   test('the same code room can be reopened and rejoined after a disconnect', async ({ browser }) => {
@@ -209,6 +288,7 @@ test.describe('6-digit code pairing (public trackers)', () => {
     const link = await readCode(host, /#k=\d{6}$/);
     const code = link.slice(-6);
     await joiner.goto(link.replace(/^https?:\/\/[^/]+/, ''));
+    await acceptCodeRequest(host);
     await expectConnected(host, joiner);
 
     // The joiner leaves; the host reopens the same room, the joiner rejoins from "recent rooms".
@@ -221,6 +301,7 @@ test.describe('6-digit code pairing (public trackers)', () => {
     const recent = joiner.getByTestId('recent-rooms');
     await expect(recent).toContainText(`${code.slice(0, 3)} ${code.slice(3)}`);
     await recent.getByTestId('rejoin-room').click();
+    await acceptCodeRequest(host);
     await expectConnected(host, joiner);
   });
 
@@ -230,6 +311,22 @@ test.describe('6-digit code pairing (public trackers)', () => {
     await page.getByTestId('start-join').click();
     await page.getByTestId('pair-code-input').fill('000000');
     await expect(page.getByRole('alert')).toContainText('bekleyen bir cihaz bulunamadı', { timeout: 40_000 });
+  });
+
+  test('a wrong code that reaches a waiting host is refused and the host is warned', async ({ browser }) => {
+    const { a: host, b: joiner } = await twoDevices(browser);
+    await host.goto('/');
+    await host.getByTestId('start-host').click();
+    const code = (await host.getByTestId('pair-code').getAttribute('data-code'))!;
+    // Same first digit, so the same room: only the PAKE can tell the codes apart.
+    const wrong = code[0] + String((Number(code.slice(1)) + 1) % 100_000).padStart(5, '0');
+
+    await joiner.goto('/');
+    await joiner.getByTestId('start-join').click();
+    await joiner.getByTestId('pair-code-input').fill(wrong);
+    await expect(joiner.getByRole('alert')).toContainText('Kod yanlış', { timeout: 30_000 });
+    await expect(host.getByTestId('code-failures')).toContainText('1/3');
+    await expect(host.getByTestId('code-request')).toHaveCount(0);
   });
 });
 

@@ -8,7 +8,8 @@ interface Props {
   autoScan?: boolean;
   busy?: boolean;
   error?: string | null;
-  onSubmit: (text: string) => void;
+  /** `scanned`: read by the camera, so it came from the screen in front of the user (useSession). */
+  onSubmit: (text: string, scanned: boolean) => void;
 }
 
 /** Scan the other device's QR code, or paste its code as a fallback. */
@@ -18,7 +19,7 @@ export function CodeEntry({ scanLabel, autoScan = false, busy = false, error, on
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (text.trim()) onSubmit(text);
+    if (text.trim()) onSubmit(text, false);
   };
 
   return (
@@ -27,7 +28,7 @@ export function CodeEntry({ scanLabel, autoScan = false, busy = false, error, on
         <QrScanner
           onResult={(value) => {
             setMode('button');
-            onSubmit(value);
+            onSubmit(value, true);
           }}
         />
       )}

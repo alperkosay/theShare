@@ -117,6 +117,8 @@ class ScreenStore {
   /** Opens the screen picker and starts sharing. Call directly from a click. */
   async share(): Promise<void> {
     if (!this.media || !this.state.supported) return;
+    const gate = session.manager?.gateError;
+    if (gate) return this.set({ error: gate });
     this.set({ error: null, asked: false });
     let stream: MediaStream;
     try {
@@ -158,6 +160,8 @@ class ScreenStore {
   /** Asks the other side to share its screen. */
   ask(): void {
     if (!this.media || !session.manager) return;
+    const gate = session.manager.gateError;
+    if (gate) return this.set({ error: gate });
     session.manager.sendMedia({ t: 'screen-ask' });
     clearTimeout(this.requestTimer);
     this.requestTimer = setTimeout(() => this.state.request === 'waiting' && this.set({ request: null }), REQUEST_TIMEOUT_MS);

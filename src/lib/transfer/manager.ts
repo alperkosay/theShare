@@ -11,6 +11,7 @@ import {
   type FileMeta,
   type MediaMessage,
 } from './protocol';
+import type { SasMessage } from '../webrtc/verify';
 import {
   canSaveToDisk,
   cleanupTemporaryFiles,
@@ -131,6 +132,9 @@ interface Incoming extends Base {
 
 type Transfer = Outgoing | Incoming;
 
+/** All an unverified connection carries: the handshake and goodbye. */
+const BEFORE_VERIFIED = new Set<ControlMessage['t']>(['hello', 'sas-commit', 'sas-reveal', 'verified', 'bye']);
+
 const isOpen = (s: TransferStatus) => s === 'pending' || s === 'active' || s === 'finishing';
 
 export class TransferManager {
@@ -145,6 +149,21 @@ export class TransferManager {
   saveFolder: () => FileSystemDirectoryHandle | null = () => null;
   /** Accept new offers without asking (the user turned it on for this connection). */
   autoAccept = false;
+  /** Security-code messages, handled by the session (lib/webrtc/verify). */
+  onSas: (message: SasMessage) => void = () => {};
+  /** The other side's hello arrived; its protocol version. */
+  onHello: (version: number) => void = () => {};
+  onPeerVerified: () => void = () => {};
+
+  /**
+   * The verification gate. Until this side has verified the connection
+   * (setVerified), no files, texts or screen-share messages go out or are
+   * accepted: on an unverified connection the other end may be someone in
+   * the middle. `peerVerified` is the other side's word that it has verified
+   * too; it only spares us sending what it would refuse anyway.
+   */
+  private verified = false;
+  private peerVerified = false;
 
   private transfers: Transfer[] = [];
   private dirty = false;
@@ -170,7 +189,30 @@ export class TransferManager {
   }
 
   get canSend(): boolean {
-    return !this.transfers.some((t) => t.direction === 'out' && isOpen(t.status));
+    return this.gateError === null && !this.transfers.some((t) => t.direction === 'out' && isOpen(t.status));
+  }
+
+  /** Why nothing can be sent yet, or null once both sides have verified the connection. */
+  get gateError(): string | null {
+    if (!this.verified) return 'Önce bağlantıyı doğrulayın: güvenlik kodunu karşı ekrandakiyle karşılaştırın.';
+    if (!this.peerVerified) return 'Karşı cihaz bağlantıyı henüz doğrulamadı.';
+    return null;
+  }
+
+  get isVerified(): boolean {
+    return this.verified;
+  }
+
+  /** This side has verified the connection: open the gate and tell the other side. */
+  setVerified(): void {
+    if (this.verified) return;
+    this.verified = true;
+    this.sendControl({ t: 'verified' });
+    this.markDirty(true);
+  }
+
+  sendSas(msg: SasMessage): void {
+    this.sendControl(msg);
   }
 
   // ---------------------------------------------------------------------------
@@ -179,6 +221,8 @@ export class TransferManager {
 
   /** Offers files to the peer; the transfer starts once they accept. */
   sendFiles(files: File[]): void {
+    const gate = this.gateError;
+    if (gate) throw new Error(gate);
     if (!this.canSend) throw new Error('Önceki gönderim bitmeden yeni gönderim başlatılamaz.');
     if (files.length === 0) return;
     if (files.length > MAX_FILES_PER_TRANSFER) {
@@ -258,6 +302,8 @@ export class TransferManager {
   /** Sends a text snippet (note, link, clipboard). No approval step: text can't execute or touch the disk. */
   sendText(text: string): void {
     if (!text.trim()) return;
+    const gate = this.gateError;
+    if (gate) throw new Error(gate);
     if (text.length > MAX_TEXT_LENGTH) throw new Error(`Metin en fazla ${MAX_TEXT_LENGTH.toLocaleString('tr-TR')} karakter olabilir.`);
     if (this.link.channel.readyState !== 'open') throw new Error('Bağlantı yok.');
     const message: TextMessage = { id: newTransferId(), direction: 'out', text, at: Date.now() };
@@ -266,8 +312,9 @@ export class TransferManager {
     this.recordText(message);
   }
 
+  /** Dropped on an unverified connection, except a "no" to a screen request. */
   sendMedia(msg: MediaMessage): void {
-    this.sendControl(msg);
+    if (this.verified || msg.t === 'screen-no') this.sendControl(msg);
   }
 
   /** Called when the underlying connection is gone. */
@@ -304,11 +351,27 @@ export class TransferManager {
   }
 
   private handleControl(msg: ControlMessage): void {
+    if (!this.verified && !BEFORE_VERIFIED.has(msg.t)) {
+      // Turned down out loud where the other side would otherwise wait for an answer.
+      if (msg.t === 'offer') this.sendControl({ t: 'reject', id: msg.id, reason: 'unverified' });
+      else if (msg.t === 'screen-ask') this.sendMedia({ t: 'screen-no' });
+      return;
+    }
     switch (msg.t) {
       case 'hello':
         if (msg.v !== PROTOCOL_VERSION) console.warn('[theshare] peer protocol version', msg.v);
         if (msg.name) {
           this.onPeerInfo({ name: msg.name, kind: msg.kind ?? 'computer', os: msg.os ?? 'other', ...(msg.id ? { id: msg.id } : {}) });
+        }
+        this.onHello(msg.v);
+        return;
+      case 'sas-commit':
+      case 'sas-reveal':
+        return this.onSas(msg);
+      case 'verified':
+        if (!this.peerVerified) {
+          this.peerVerified = true;
+          this.onPeerVerified();
         }
         return;
       case 'text': {
@@ -333,7 +396,15 @@ export class TransferManager {
       case 'reject': {
         const t = this.find(msg.id, 'out');
         if (t && isOpen(t.status)) {
-          this.finish(t, 'rejected', msg.reason === 'busy' ? 'Alıcı şu anda başka bir aktarımı işliyor.' : 'Alıcı aktarımı reddetti.');
+          this.finish(
+            t,
+            'rejected',
+            msg.reason === 'busy'
+              ? 'Alıcı şu anda başka bir aktarımı işliyor.'
+              : msg.reason === 'unverified'
+                ? 'Karşı cihaz bağlantıyı henüz doğrulamadı.'
+                : 'Alıcı aktarımı reddetti.',
+          );
         }
         return;
       }

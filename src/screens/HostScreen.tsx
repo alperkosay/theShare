@@ -12,9 +12,9 @@ export function HostScreen() {
   const [busy, setBusy] = useState(false);
   const link = localCode ? buildOfferLink(location.href, localCode) : null;
 
-  const submitAnswer = async (text: string) => {
+  const submitAnswer = async (text: string, scanned: boolean) => {
     setBusy(true);
-    setAnswerError(await session.submitAnswer(text));
+    setAnswerError(await session.submitAnswer(text, { scanned }));
     setBusy(false);
   };
 
@@ -29,7 +29,7 @@ export function HostScreen() {
         <QrCode text={link} label="Bağlantı QR kodu" />
         <CopyButton text={link} label="Bağlantıyı kopyala" />
         <h2 className="title">2. Sonra onun gösterdiği kodu tarayın</h2>
-        <CodeEntry scanLabel="Kodu tara" busy={busy} error={answerError} onSubmit={(t) => void submitAnswer(t)} />
+        <CodeEntry scanLabel="Kodu tara" busy={busy} error={answerError} onSubmit={(t, scanned) => void submitAnswer(t, scanned)} />
       </>
     );
   }

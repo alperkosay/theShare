@@ -19,6 +19,8 @@ import { GlobalDrop, Toasts } from './components/GlobalDrop';
 import { usePopout } from './hooks/usePopout';
 import { Dock, type Tab } from './components/Dock';
 import { RequestSheet } from './components/Radar';
+import { VerifySheet, VerifyStrip } from './components/Verify';
+import { CodeRequestSheet } from './components/CodeRequest';
 import { UpdatePrompt } from './components/UpdatePrompt';
 import { InstallPrompt } from './components/Install';
 
@@ -95,6 +97,7 @@ export function App() {
     <div className={`app${transferring ? ' busy' : ''}`} data-testid="link-status" data-state={state.linkState}>
       {/* key: remount per tab so its content plays the entrance animation */}
       <main className={`screen tab-${tab}${wide ? ' wide' : ''}${tab === 'screen' && streaming ? ' meeting' : ''}`} key={tab}>
+        <VerifyStrip />
         {content}
       </main>
       <Dock
@@ -113,7 +116,9 @@ export function App() {
       <CommandPalette onOpen={setTab} />
       <Toasts />
       <RequestSheet />
-      <UpdatePrompt busy={transferring} />
+      <VerifySheet />
+      <CodeRequestSheet />
+      <UpdatePrompt busy={transferring || streaming} />
       <InstallPrompt home={tab === 'devices' && !air && state.role === null && !state.wasConnected} />
     </div>
   );

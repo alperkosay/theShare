@@ -1,4 +1,5 @@
-import { decodeSignal, encodeSignal, SignalError, type SessionDescription } from './signal-codec';
+import { decodeSignal, encodeSignal, sdpFingerprint, SignalError, type SessionDescription } from './signal-codec';
+import { deviceCertificate } from './identity';
 
 /**
  * One RTCPeerConnection + one data channel, with manual (copy/QR) signaling.
@@ -59,7 +60,11 @@ export class PeerLink {
   private readonly connectFailedMessage: string;
 
   constructor({ remote = false }: LinkOptions = {}) {
-    this.pc = new RTCPeerConnection({ iceServers: remote ? [{ urls: STUN_SERVERS }] : [] });
+    const certificate = deviceCertificate();
+    this.pc = new RTCPeerConnection({
+      iceServers: remote ? [{ urls: STUN_SERVERS }] : [],
+      ...(certificate ? { certificates: [certificate] } : {}),
+    });
     this.connectFailedMessage = remote ? MSG_REMOTE_FAILED : MSG_LOCAL_FAILED;
     // Pre-negotiated channel: same id on both sides, no ondatachannel round-trip.
     this.channel = this.pc.createDataChannel('theshare', { negotiated: true, id: 0, ordered: true });
@@ -148,6 +153,15 @@ export class PeerLink {
 
   get remoteSdp(): string {
     return this.pc.remoteDescription?.sdp ?? '';
+  }
+
+  /** DTLS certificate fingerprints (sha-256, "AB:CD:…"); the remote one is what DTLS verified. */
+  get localFingerprint(): string | null {
+    return sdpFingerprint(this.localSdp);
+  }
+
+  get remoteFingerprint(): string | null {
+    return sdpFingerprint(this.remoteSdp);
   }
 
   /** Candidate pair actually in use, e.g. "host ↔ host" (diagnostics only). */
