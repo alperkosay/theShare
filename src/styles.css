@@ -31,6 +31,8 @@
   --peach: #fde3cf;
   --lemon: #fbf0c0;
   --rose: #fdd9dd;
+  /* "Live" dot of a running screen share. */
+  --live: #ff3b30;
   --ok: #2e8b57;
   --error: #d1394a;
   --error-bg: var(--rose);
@@ -1917,6 +1919,321 @@ select {
 
 .viewer-nav.next {
   right: 12px;
+}
+
+/* --- screen sharing --- */
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.badge.live {
+  top: -3px;
+  right: -5px;
+  min-width: 10px;
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border: 2px solid var(--glass);
+  background: var(--live);
+  animation: live-blink 1.6s ease-in-out infinite;
+}
+
+.live-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--live);
+  vertical-align: 1px;
+  animation: live-blink 1.6s ease-in-out infinite;
+}
+
+@keyframes live-blink {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.live-pill {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 55%);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  pointer-events: none;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+.screen-view {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px;
+}
+
+/* The stage stays dark in every theme: it frames someone else's screen. */
+.screen-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 10;
+  max-height: 70dvh;
+  border-radius: calc(var(--radius) - 8px);
+  background: #000;
+  overflow: hidden;
+}
+
+.screen-stage video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.screen-stage.full {
+  aspect-ratio: auto;
+  max-height: none;
+  border-radius: 0;
+}
+
+.screen-wait {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px;
+  background: #000;
+  color: #c7c7cc;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.screen-wait .mini-spinner {
+  border-color: rgb(255 255 255 / 20%);
+  border-top-color: #fff;
+}
+
+.screen-tools {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: flex;
+  gap: 6px;
+}
+
+.screen-tool {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: none;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 55%);
+  color: #fff;
+  cursor: pointer;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  transition:
+    transform 0.18s var(--spring),
+    background 0.2s;
+}
+
+.screen-tool:hover:not(:disabled) {
+  background: rgb(0 0 0 / 75%);
+}
+
+.screen-tool:active:not(:disabled) {
+  transform: scale(0.9);
+}
+
+.screen-tool.active {
+  background: #fff;
+  color: #000;
+}
+
+.screen-tool:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.screen-tool .icon {
+  width: 18px;
+  height: 18px;
+}
+
+/* Full screen: the toolbar fades out while the pointer is elsewhere, like a video player. */
+@media (hover: hover) {
+  .screen-stage.full .screen-tools,
+  .screen-stage.full .live-pill {
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .screen-stage.full:hover .screen-tools,
+  .screen-stage.full:hover .live-pill {
+    opacity: 1;
+  }
+}
+
+.screen-caption {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 8px 4px;
+}
+
+.screen-peer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 20px;
+}
+
+.screen-cta .dropzone-icon {
+  background: var(--mint);
+}
+
+.screen-options,
+.screen-sharing {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+}
+
+.screen-quality {
+  gap: 6px;
+}
+
+.segmented.two {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.screen-self {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.screen-thumb {
+  flex-shrink: 0;
+  width: 112px;
+  aspect-ratio: 16 / 10;
+  border-radius: 12px;
+  background: #000;
+  overflow: hidden;
+}
+
+.screen-thumb video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.screen-privacy .icon {
+  width: 14px;
+  height: 14px;
+  vertical-align: -2px;
+  color: var(--ok);
+}
+
+/* Floating mini player on the other tabs. Top right: the bottom has the dock and the chat composer. */
+.screen-mini {
+  position: fixed;
+  z-index: 22;
+  top: max(12px, env(safe-area-inset-top));
+  right: 12px;
+  width: min(40vw, 176px);
+  aspect-ratio: 16 / 10;
+  border-radius: 16px;
+  background: #000;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 18%), 0 18px 40px -16px rgb(0 0 0 / 45%);
+  animation: rise 0.45s var(--spring) both;
+}
+
+.screen-mini-open {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  border-radius: inherit;
+  background: none;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.screen-mini-open video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.screen-mini .live-pill {
+  top: 6px;
+  left: 6px;
+  padding: 2px 8px;
+  font-size: 0.62rem;
+}
+
+.screen-mini-close {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--glass-border);
+  border-radius: 50%;
+  background: var(--glass);
+  color: var(--text);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 20%);
+  cursor: pointer;
+}
+
+.screen-mini-close .icon {
+  width: 14px;
+  height: 14px;
+}
+
+.toast.screen-ask {
+  padding-left: 8px;
+}
+
+/* .toast span stretches the text; the icon keeps its size. */
+.toast .small-avatar {
+  flex: none;
+}
+
+.toast.screen-ask > span:not(.avatar) {
+  line-height: 1.3;
+}
+
+.small-avatar {
+  width: 36px;
+  height: 36px;
+  background: var(--mint);
+  color: var(--on-pastel);
+}
+
+.small-avatar .icon {
+  width: 18px;
+  height: 18px;
 }
 
 /* --- theme picker (settings) --- */

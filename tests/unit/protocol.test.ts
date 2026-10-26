@@ -33,6 +33,32 @@ describe('parseControl', () => {
     ];
     for (const text of bad) expect(parseControl(text), text).toBeNull();
   });
+
+  it('accepts screen-sharing messages and bounds them', () => {
+    expect(parseControl('{"t":"sdp","type":"offer","sdp":"v=0"}')).toEqual({ t: 'sdp', type: 'offer', sdp: 'v=0' });
+    expect(parseControl('{"t":"ice","candidate":"candidate:1 1 udp 1 1.2.3.4 5 typ host","mid":"1","index":1}')).toEqual({
+      t: 'ice',
+      candidate: 'candidate:1 1 udp 1 1.2.3.4 5 typ host',
+      mid: '1',
+      index: 1,
+    });
+    expect(parseControl('{"t":"ice","candidate":"c","mid":null,"index":null}')).toEqual({ t: 'ice', candidate: 'c', mid: null, index: null });
+    expect(parseControl('{"t":"screen","on":true,"audio":true}')).toEqual({ t: 'screen', on: true, audio: true });
+    expect(parseControl('{"t":"screen","on":false,"audio":true}')).toEqual({ t: 'screen', on: false });
+    expect(parseControl('{"t":"screen-ask"}')).toEqual({ t: 'screen-ask' });
+    expect(parseControl('{"t":"screen-no","unsupported":true}')).toEqual({ t: 'screen-no', unsupported: true });
+
+    const bad = [
+      '{"t":"sdp","type":"pranswer","sdp":"v=0"}',
+      '{"t":"sdp","type":"offer"}',
+      JSON.stringify({ t: 'sdp', type: 'offer', sdp: 'x'.repeat(65 * 1024) }),
+      '{"t":"ice","candidate":"c","mid":5,"index":0}',
+      '{"t":"ice","candidate":"c","mid":"0","index":-1}',
+      JSON.stringify({ t: 'ice', candidate: 'x'.repeat(2000), mid: '0', index: 0 }),
+      '{"t":"screen","on":"yes"}',
+    ];
+    for (const text of bad) expect(parseControl(text), text).toBeNull();
+  });
 });
 
 describe('sanitizeFileName', () => {

@@ -16,6 +16,10 @@
  *   …next file…
  *                          ◀──     complete {id}
  *   cancel {id} may be sent by either side at any time.
+ *
+ * Screen sharing (lib/webrtc/media) adds media tracks to the same connection;
+ * the renegotiation that needs (sdp, ice) and the share's state (screen,
+ * screen-ask, screen-no) travel as control messages too.
  */
 
 import { cleanPeerName, parseDeviceType, type DeviceKind, type DeviceOs } from '../device';
@@ -34,6 +38,9 @@ export interface FileMeta {
 
 /** Text/clipboard messages: generous, but bounded so a peer can't flood memory. */
 export const MAX_TEXT_LENGTH = 100_000;
+/** Renegotiation SDP with audio + video sections is a few KB; this leaves plenty of room. */
+const MAX_MEDIA_SDP_LENGTH = 64 * 1024;
+const MAX_CANDIDATE_LENGTH = 1024;
 
 export type ControlMessage =
   /** Sent once on connect: display identity plus a persistent random device id (see lib/device). */
@@ -47,7 +54,19 @@ export type ControlMessage =
   | { t: 'ack'; id: string; bytes: number }
   | { t: 'complete'; id: string }
   | { t: 'cancel'; id: string; reason?: string }
-  | { t: 'bye' };
+  | { t: 'bye' }
+  | MediaMessage;
+
+export type MediaMessage =
+  /** Renegotiation of this connection when screen-share tracks are added or removed. */
+  | { t: 'sdp'; type: 'offer' | 'answer'; sdp: string }
+  | { t: 'ice'; candidate: string; mid: string | null; index: number | null }
+  /** The sender started (`on`) or stopped sharing its screen; `audio` when it includes sound. */
+  | { t: 'screen'; on: boolean; audio?: boolean }
+  /** The viewer asks to see the other side's screen… */
+  | { t: 'screen-ask' }
+  /** …and the answer when it won't come: declined, or this browser can't capture its screen. */
+  | { t: 'screen-no'; unsupported?: boolean };
 
 const isId = (v: unknown): v is string => typeof v === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(v);
 const isCount = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0;
@@ -112,6 +131,23 @@ export function parseControl(text: string): ControlMessage | null {
       return isId(m.id) && isCount(m.bytes) ? { t: 'ack', id: m.id, bytes: m.bytes } : null;
     case 'bye':
       return { t: 'bye' };
+    case 'sdp':
+      return (m.type === 'offer' || m.type === 'answer') && typeof m.sdp === 'string' && m.sdp.length <= MAX_MEDIA_SDP_LENGTH
+        ? { t: 'sdp', type: m.type, sdp: m.sdp }
+        : null;
+    case 'ice': {
+      const midOk = m.mid === null || (typeof m.mid === 'string' && m.mid.length <= 32);
+      const indexOk = m.index === null || isCount(m.index);
+      return typeof m.candidate === 'string' && m.candidate.length <= MAX_CANDIDATE_LENGTH && midOk && indexOk
+        ? { t: 'ice', candidate: m.candidate, mid: m.mid as string | null, index: m.index as number | null }
+        : null;
+    }
+    case 'screen':
+      return typeof m.on === 'boolean' ? { t: 'screen', on: m.on, ...(m.on && m.audio === true ? { audio: true } : {}) } : null;
+    case 'screen-ask':
+      return { t: 'screen-ask' };
+    case 'screen-no':
+      return { t: 'screen-no', ...(m.unsupported === true ? { unsupported: true } : {}) };
     default:
       return null;
   }

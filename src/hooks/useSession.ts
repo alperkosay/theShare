@@ -76,6 +76,8 @@ class Session {
   onRecord: (record: TransferRecord, context: RecordContext) => void = () => {};
   /** The save folder for accepted files, if one is set (hooks/useSaving). */
   saveFolder: () => FileSystemDirectoryHandle | null = () => null;
+  /** A connection came up (link + manager), or the current one is gone (null). Screen sharing hooks in here (hooks/useScreen). */
+  onConnection: (connection: { link: PeerLink; manager: TransferManager } | null) => void = () => {};
 
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -267,6 +269,7 @@ class Session {
     this.stopRendezvous?.();
     this.stopRendezvous = null;
     clearTimeout(this.expiryTimer);
+    if (this.manager) this.onConnection(null);
     this.manager?.dispose();
     this.manager = null;
     this.detachLink()?.close();
@@ -306,6 +309,7 @@ class Session {
           this.peerLeft = true;
         };
         this.manager = manager;
+        this.onConnection({ link, manager });
         this.set({ linkState, error, wasConnected: true });
         const { method, role, pairCode } = this.state;
         if (method === 'code' && role && pairCode) rooms.remember(pairCode, role);
@@ -317,6 +321,7 @@ class Session {
       if (linkState === 'failed' && this.state.wasConnected) {
         const message = this.peerLeft ? 'Karşı cihaz oturumu kapattı.' : (error ?? 'Bağlantı koptu.');
         this.manager?.handleDisconnect(message);
+        this.onConnection(null);
         this.set({ linkState, error: message });
         return;
       }

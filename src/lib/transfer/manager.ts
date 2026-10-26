@@ -9,6 +9,7 @@ import {
   sanitizeFileName,
   type ControlMessage,
   type FileMeta,
+  type MediaMessage,
 } from './protocol';
 import {
   canSaveToDisk,
@@ -138,6 +139,8 @@ export class TransferManager {
   onPeerInfo: (peer: PeerInfo) => void = () => {};
   onText: (message: TextMessage) => void = () => {};
   onRecord: (record: TransferRecord) => void = () => {};
+  /** Screen-sharing messages, handled by lib/webrtc/media. */
+  onMedia: (message: MediaMessage) => void = () => {};
   /** The save folder picked in the settings, if incoming files should go straight there. */
   saveFolder: () => FileSystemDirectoryHandle | null = () => null;
   /** Accept new offers without asking (the user turned it on for this connection). */
@@ -263,6 +266,10 @@ export class TransferManager {
     this.recordText(message);
   }
 
+  sendMedia(msg: MediaMessage): void {
+    this.sendControl(msg);
+  }
+
   /** Called when the underlying connection is gone. */
   handleDisconnect(message: string): void {
     for (const t of this.transfers) {
@@ -356,6 +363,12 @@ export class TransferManager {
         return this.handleFileStart(msg.id, msg.index);
       case 'file-end':
         return this.handleFileEnd(msg.id, msg.index);
+      case 'sdp':
+      case 'ice':
+      case 'screen':
+      case 'screen-ask':
+      case 'screen-no':
+        return this.onMedia(msg);
     }
   }
 

@@ -75,6 +75,12 @@ class SavingStore {
     return null;
   }
 
+  /** Saves a file made on this device (a screen snapshot). Call from a click. Returns a user-facing error, or null. */
+  async saveFile(file: File): Promise<string | null> {
+    const result = await saveFiles([file], this.mode(), this.folder);
+    return result.saved ? null : result.error;
+  }
+
   /** Saves all received files of a transfer as one ZIP. Returns a user-facing error, or null. */
   async saveAsZip(t: TransferView): Promise<string | null> {
     const indices = t.received.flatMap((r, i) => (r.file ? [i] : []));

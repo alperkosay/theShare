@@ -492,3 +492,78 @@ test('first visit suggests installing the app once; the profile offers it too', 
   await page.getByTestId('profile-chip').click();
   await expect(page.getByTestId('install-app')).toBeVisible();
 });
+
+/** Stands in for the screen picker: a 640×360 canvas that keeps changing colour, plus a tone if sound was asked for. */
+function fakeScreenPicker() {
+  navigator.mediaDevices.getDisplayMedia = async (options?: DisplayMediaStreamOptions) => {
+    const canvas = Object.assign(document.createElement('canvas'), { width: 640, height: 360 });
+    const ctx = canvas.getContext('2d')!;
+    let hue = 0;
+    setInterval(() => {
+      ctx.fillStyle = `hsl(${(hue += 7) % 360} 70% 50%)`;
+      ctx.fillRect(0, 0, 640, 360);
+    }, 50);
+    const stream = canvas.captureStream(20);
+    if (options?.audio) {
+      const audio = new AudioContext();
+      const tone = audio.createOscillator();
+      const out = audio.createMediaStreamDestination();
+      tone.connect(out);
+      tone.start();
+      stream.addTrack(out.stream.getAudioTracks()[0]!);
+    }
+    return stream;
+  };
+}
+
+test('screen sharing: on request, both ways at once, mini player, snapshot, stop and share again with sound', async ({ browser }) => {
+  const pages: Page[] = [];
+  for (let i = 0; i < 2; i++) {
+    const context = await browser.newContext();
+    await context.addInitScript(fakeScreenPicker);
+    pages.push(await context.newPage());
+  }
+  const [host, joiner] = pages as [Page, Page];
+  await pair(host, joiner);
+  for (const page of pages) await page.getByTestId('tab-screen').click();
+
+  // The joiner asks; the host accepts from the prompt and the picture arrives.
+  await joiner.getByTestId('screen-ask').click();
+  await host.getByTestId('screen-ask-accept').click();
+  await expect(host.getByTestId('local-screen')).toBeVisible();
+  const atJoiner = joiner.getByTestId('remote-screen');
+  await expect(atJoiner).toHaveAttribute('data-ready', 'true', { timeout: 30_000 });
+  await expect(atJoiner).toHaveAttribute('data-size', '640x360');
+
+  // A snapshot of the received picture is saved as a PNG.
+  const [snapshot] = await Promise.all([joiner.waitForEvent('download'), joiner.getByTestId('screen-snapshot').click()]);
+  expect(snapshot.suggestedFilename()).toMatch(/^ekran-.*\.png$/);
+
+  // The joiner shares too: renegotiation the other way while the first share runs.
+  await joiner.getByTestId('screen-share').click();
+  await expect(host.getByTestId('remote-screen')).toHaveAttribute('data-ready', 'true', { timeout: 30_000 });
+  await expect(atJoiner).toHaveAttribute('data-ready', 'true');
+
+  // On another tab the host keeps watching in the mini player.
+  await host.getByTestId('tab-files').click();
+  await expect(host.getByTestId('screen-mini')).toBeVisible();
+  await joiner.getByTestId('screen-stop').click();
+  await expect(host.getByTestId('screen-mini')).toBeHidden();
+
+  // The host stops; the joiner is back to the "not sharing" state.
+  await host.getByTestId('tab-screen').click();
+  await host.getByTestId('screen-stop').click();
+  await expect(atJoiner).toBeHidden();
+  await expect(joiner.getByTestId('peer-idle')).toBeVisible();
+
+  // A declined request is reported back.
+  await joiner.getByTestId('screen-ask').click();
+  await host.getByTestId('screen-ask-decline').click();
+  await expect(joiner.getByTestId('peer-idle')).toContainText('paylaşmak istemedi');
+
+  // Sharing again (reusing the transceivers), this time with sound.
+  await host.getByTestId('screen-audio').check();
+  await host.getByTestId('screen-share').click();
+  await expect(atJoiner).toHaveAttribute('data-ready', 'true', { timeout: 30_000 });
+  await expect(joiner.getByTestId('screen-sound')).toBeVisible();
+});

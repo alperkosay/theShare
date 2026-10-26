@@ -10,6 +10,9 @@ import type { AirMode } from './screens/AirScreen';
 import { FilesTab } from './screens/FilesTab';
 import { ClipboardTab } from './screens/ClipboardTab';
 import { HistoryTab } from './screens/HistoryTab';
+import { ScreenTab } from './screens/ScreenTab';
+import { useScreenShare } from './hooks/useScreenShare';
+import { ScreenAskPrompt, ScreenMini } from './components/ScreenShare';
 import { Dock, type Tab } from './components/Dock';
 import { RequestSheet } from './components/Radar';
 import { UpdatePrompt } from './components/UpdatePrompt';
@@ -36,8 +39,11 @@ export function App() {
   const [tab, setTab] = useState<Tab>('devices');
   const [air, setAir] = useState<AirMode | null>(null);
   const transferring = state.transfers.some((t) => t.status === 'active' || t.status === 'finishing');
+  const screen = useScreenShare();
+  const streaming = screen.local !== null || screen.remote !== null;
 
-  useKeepAlive(transferring);
+  // A share also needs the screen on (and the page open) to keep going.
+  useKeepAlive(transferring || streaming);
 
   useEffect(() => {
     // Our own room's link (e.g. opened again from the chat we shared it in) reopens the room instead of joining it.
@@ -71,6 +77,7 @@ export function App() {
   let content;
   if (tab === 'files') content = <FilesTab onOpenDevices={() => setTab('devices')} />;
   else if (tab === 'clipboard') content = <ClipboardTab onOpenDevices={() => setTab('devices')} />;
+  else if (tab === 'screen') content = <ScreenTab onOpenDevices={() => setTab('devices')} />;
   else if (tab === 'history') content = <HistoryTab onOpenFiles={() => setTab('files')} />;
   else content = <DevicesTab invite={invite} air={air} onAir={setAir} />;
 
@@ -83,8 +90,14 @@ export function App() {
       <Dock
         tab={tab}
         onChange={setTab}
-        badges={{ files: tab === 'files' ? 0 : pendingOffers, clipboard: tab === 'clipboard' ? 0 : incomingTexts - seenTexts }}
+        badges={{
+          files: tab === 'files' ? 0 : pendingOffers,
+          clipboard: tab === 'clipboard' ? 0 : incomingTexts - seenTexts,
+          screen: tab !== 'screen' && screen.remote ? 'live' : 0,
+        }}
       />
+      {tab !== 'screen' && <ScreenMini onOpen={() => setTab('screen')} />}
+      <ScreenAskPrompt onShare={() => setTab('screen')} />
       <RequestSheet />
       <UpdatePrompt busy={transferring} />
       <InstallPrompt home={tab === 'devices' && !air && state.role === null && !state.wasConnected} />
