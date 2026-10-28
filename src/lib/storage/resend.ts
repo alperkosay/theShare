@@ -1,4 +1,5 @@
 import type { ResendRecord } from './history';
+import { zipFolder } from '../transfer/folder';
 
 /**
  * Where a file we're sending came from, so the history can keep it for resend:
@@ -27,13 +28,25 @@ export async function pickFilesWithHandles(): Promise<File[]> {
   );
 }
 
-/** Files from a drop, with their handles where the browser offers them. */
-export async function filesFromDrop(data: DataTransfer): Promise<File[]> {
+/**
+ * Files from a drop, with their handles where the browser offers them.
+ * Dropped folders come back zipped; `onZipping` fires first if there are any.
+ */
+export async function filesFromDrop(data: DataTransfer, onZipping?: () => void): Promise<File[]> {
   // Everything has to be read synchronously, inside the drop event.
   const items = [...data.items].filter((i) => i.kind === 'file');
-  const pairs = items.map((item) => ({ file: item.getAsFile(), handle: item.getAsFileSystemHandle?.() ?? null }));
+  const pairs = items.map((item) => {
+    const entry = item.webkitGetAsEntry?.() ?? null;
+    const dir = entry?.isDirectory ? (entry as FileSystemDirectoryEntry) : null;
+    return { file: item.getAsFile(), dir, handle: dir ? null : (item.getAsFileSystemHandle?.() ?? null) };
+  });
+  if (pairs.some((p) => p.dir)) onZipping?.();
   const files: File[] = [];
-  for (const { file, handle } of pairs) {
+  for (const { file, dir, handle } of pairs) {
+    if (dir) {
+      files.push(await zipFolder(dir));
+      continue;
+    }
     if (!file) continue;
     const h = await handle?.catch(() => null);
     if (h?.kind === 'file') handles.set(file, h as FileSystemFileHandle);

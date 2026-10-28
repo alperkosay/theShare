@@ -89,7 +89,9 @@ export function FilesTab({ onOpenDevices }: { onOpenDevices: () => void }) {
             onDrop={(e) => {
               e.preventDefault();
               setDragging(false);
-              void filesFromDrop(e.dataTransfer).then(send);
+              void filesFromDrop(e.dataTransfer, () => setZipping(true))
+                .then(send, (err: Error) => alert(err.message))
+                .finally(() => setZipping(false));
             }}
           >
             <span className="dropzone-icon">
@@ -97,7 +99,7 @@ export function FilesTab({ onOpenDevices }: { onOpenDevices: () => void }) {
             </span>
             <strong>{zipping ? 'ZIP hazırlanıyor…' : sending ? 'Gönderim sürüyor…' : locked ? 'Doğrulama bekleniyor' : connected ? 'Dosya gönder' : 'Bağlantı yok'}</strong>
             <span className="small muted">
-              {locked ? 'Güvenlik kodu iki ekranda karşılaştırılınca açılır' : connected ? 'Dokunun ya da dosyaları buraya bırakın' : 'Yeni gönderim için yeniden bağlanın'}
+              {locked ? 'Güvenlik kodu iki ekranda karşılaştırılınca açılır' : connected ? 'Dokunun ya da dosya/klasörleri buraya bırakın' : 'Yeni gönderim için yeniden bağlanın'}
             </span>
           </button>
 

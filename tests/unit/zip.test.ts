@@ -1,6 +1,6 @@
 import { crc32 } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
-import { canZip, zipFiles } from '../../src/lib/transfer/zip';
+import { canZip, zipEntries, zipFiles } from '../../src/lib/transfer/zip';
 
 /** Minimal reader: walks the central directory and returns each entry's name and stored bytes. */
 function readZip(buf: Buffer): Array<{ name: string; data: Buffer; crc: number }> {
@@ -43,6 +43,25 @@ describe('zipFiles', () => {
       expect(e.data.equals(originals[i]!)).toBe(true);
       expect(e.crc).toBe(crc32(originals[i]!));
     });
+  });
+
+  it('keeps folder paths and empty directories', async () => {
+    const zip = await zipEntries(
+      [
+        { path: 'proje/' },
+        { path: 'proje/a.txt', file: new File(['a'], 'a.txt') },
+        { path: 'proje/boş/' },
+        { path: 'proje/alt/b.txt', file: new File(['bb'], 'b.txt') },
+      ],
+      'proje.zip',
+    );
+    const entries = readZip(Buffer.from(await zip.arrayBuffer()));
+    expect(entries.map((e) => [e.name, e.data.toString()])).toEqual([
+      ['proje/', ''],
+      ['proje/a.txt', 'a'],
+      ['proje/boş/', ''],
+      ['proje/alt/b.txt', 'bb'],
+    ]);
   });
 
   it('only zips 2+ files', () => {

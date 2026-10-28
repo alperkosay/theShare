@@ -41,11 +41,22 @@ function dosDateTime(ms: number): { time: number; date: number } {
   };
 }
 
+/** A file stored at `path` (may contain "/"), or a directory when `file` is missing (`path` ends with "/"). */
+export interface ZipEntry {
+  path: string;
+  file?: File;
+}
+
+/** True if these entries fit in a single classic ZIP. */
+export function fitsZip(entries: ZipEntry[]): boolean {
+  if (!entries.length || entries.length > ZIP_MAX_FILES) return false;
+  const overhead = entries.reduce((sum, e) => sum + 128 + 2 * e.path.length * 3, 22);
+  return entries.reduce((sum, e) => sum + (e.file?.size ?? 0), overhead) < ZIP_MAX_BYTES;
+}
+
 /** True if these files can go into a single classic ZIP. */
 export function canZip(files: File[]): boolean {
-  if (files.length < 2 || files.length > ZIP_MAX_FILES) return false;
-  const overhead = files.reduce((sum, f) => sum + 128 + 2 * f.name.length * 3, 22);
-  return files.reduce((sum, f) => sum + f.size, overhead) < ZIP_MAX_BYTES;
+  return files.length >= 2 && fitsZip(files.map((file) => ({ path: file.name, file })));
 }
 
 function uniqueNames(files: File[]): string[] {
@@ -64,17 +75,22 @@ function uniqueNames(files: File[]): string[] {
 
 export async function zipFiles(files: File[], zipName: string): Promise<File> {
   if (!canZip(files)) throw new Error('Bu dosyalar tek bir ZIP için fazla büyük.');
+  const names = uniqueNames(files);
+  return zipEntries(files.map((file, i) => ({ path: names[i]!, file })), zipName);
+}
+
+export async function zipEntries(entries: ZipEntry[], zipName: string): Promise<File> {
+  if (!fitsZip(entries)) throw new Error('Bu dosyalar tek bir ZIP için fazla büyük.');
   const enc = new TextEncoder();
   const parts: BlobPart[] = [];
   const central: Uint8Array<ArrayBuffer>[] = [];
   let offset = 0;
 
-  const names = uniqueNames(files);
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i]!;
-    const name = enc.encode(names[i]!);
-    const crc = await crc32(file);
-    const { time, date } = dosDateTime(file.lastModified);
+  for (const { path, file } of entries) {
+    const name = enc.encode(path);
+    const size = file?.size ?? 0;
+    const crc = file ? await crc32(file) : 0;
+    const { time, date } = dosDateTime(file?.lastModified ?? Date.now());
 
     const local = new Uint8Array(30 + name.length);
     const lv = new DataView(local.buffer);
@@ -85,8 +101,8 @@ export async function zipFiles(files: File[], zipName: string): Promise<File> {
     lv.setUint16(10, time, true);
     lv.setUint16(12, date, true);
     lv.setUint32(14, crc, true);
-    lv.setUint32(18, file.size, true);
-    lv.setUint32(22, file.size, true);
+    lv.setUint32(18, size, true);
+    lv.setUint32(22, size, true);
     lv.setUint16(26, name.length, true);
     local.set(name, 30);
 
@@ -100,23 +116,25 @@ export async function zipFiles(files: File[], zipName: string): Promise<File> {
     cv.setUint16(12, time, true);
     cv.setUint16(14, date, true);
     cv.setUint32(16, crc, true);
-    cv.setUint32(20, file.size, true);
-    cv.setUint32(24, file.size, true);
+    cv.setUint32(20, size, true);
+    cv.setUint32(24, size, true);
     cv.setUint16(28, name.length, true);
+    if (!file) cv.setUint32(38, 0x10, true); // external attributes: MS-DOS directory
     cv.setUint32(42, offset, true); // local header offset
     entry.set(name, 46);
 
-    parts.push(local, file);
+    parts.push(local);
+    if (file) parts.push(file);
     central.push(entry);
-    offset += local.length + file.size;
+    offset += local.length + size;
   }
 
   const centralSize = central.reduce((sum, e) => sum + e.length, 0);
   const end = new Uint8Array(22);
   const ev = new DataView(end.buffer);
   ev.setUint32(0, 0x06054b50, true); // end of central directory signature
-  ev.setUint16(8, files.length, true);
-  ev.setUint16(10, files.length, true);
+  ev.setUint16(8, entries.length, true);
+  ev.setUint16(10, entries.length, true);
   ev.setUint32(12, centralSize, true);
   ev.setUint32(16, offset, true);
 

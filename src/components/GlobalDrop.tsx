@@ -57,7 +57,9 @@ export function GlobalDrop() {
       if (!hasFiles(e) || e.defaultPrevented) return;
       e.preventDefault();
       if (!connected) return toast.show('Göndermek için önce bir cihaza bağlanın.', 'error');
-      void filesFromDrop(e.dataTransfer!).then(sendFilesNow);
+      void filesFromDrop(e.dataTransfer!, () => toast.show('Klasör ZIP olarak hazırlanıyor…')).then(sendFilesNow, (err: Error) =>
+        toast.show(err.message, 'error'),
+      );
     };
     window.addEventListener('dragenter', enter);
     window.addEventListener('dragleave', leave);
